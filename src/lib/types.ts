@@ -94,6 +94,7 @@ export interface InsurerRow {
   active: number;
   audit_allowed: number;
   is_demo: number;
+  parent_group: string | null;
 }
 
 export interface VerdictCriterion {

@@ -5,7 +5,9 @@ import PendingCompare from "@/components/PendingCompare";
 import VerdictResult from "@/components/VerdictResult";
 import { get } from "@/lib/db";
 import { findVerdict } from "@/lib/judge";
-import { insurerBySlug, isFresh, latestScoredAudit } from "@/lib/queries";
+import Link from "next/link";
+import { Card } from "@/components/ui";
+import { auditBlocker, insurerBySlug, isFresh, latestScoredAudit } from "@/lib/queries";
 import { verdictView } from "@/lib/views";
 
 function parse(matchup: string) {
@@ -39,6 +41,10 @@ export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[ma
   const view = verdict ? verdictView(verdict.id, a.id) : null;
 
   if (!view) {
+    const blocked = [
+      { name: a.name, why: auditBlocker(a, p, auditA) },
+      { name: b.name, why: auditBlocker(b, p, auditB) },
+    ].filter((x) => x.why);
     return (
       <div className="grid gap-6">
         <div>
@@ -49,7 +55,27 @@ export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[ma
             {a.name} <span className="text-muted">vs</span> {b.name}
           </h1>
         </div>
-        <PendingCompare country={country} product={p} a={a.slug} b={b.slug} names={[a.name, b.name]} />
+        {blocked.length ? (
+          <Card>
+            <h2 className="font-medium">This matchup can&rsquo;t be audited yet</h2>
+            <ul className="mt-2 grid list-disc gap-1 pl-5 text-sm">
+              {blocked.map((x) => (
+                <li key={x.name}>
+                  {x.name} is {x.why}.
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm text-muted">
+              Real insurers are audited only after their website terms have been checked to allow automated access. Until then you can compare insurers in the{" "}
+              <Link href="/" className="text-accent hover:underline">
+                demo market
+              </Link>
+              .
+            </p>
+          </Card>
+        ) : (
+          <PendingCompare country={country} product={p} a={a.slug} b={b.slug} names={[a.name, b.name]} />
+        )}
       </div>
     );
   }

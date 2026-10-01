@@ -18,12 +18,14 @@ export interface InsurerOption {
   auditedAt: string | null;
   fresh: boolean;
   overall: number | null;
+  /** Parent group, e.g. "Fairfax". */
+  group: string | null;
+  /** Why a new audit can't run yet; null when the insurer can be compared now. */
+  blocker: string | null;
 }
 
-/** Insurers the public can pick: active, and either already audited or cleared for audits. */
-const ELIGIBLE = `
-  i.active = 1 AND (i.audit_allowed = 1 OR EXISTS (
-    SELECT 1 FROM audits a WHERE a.insurer_id = i.id AND a.product_line_id = ip.product_line_id AND a.status = 'scored'))`;
+/** Insurers the public can pick. Ones not cleared for audits are listed but can't be compared until an admin clears them. */
+const ELIGIBLE = `i.active = 1`;
 
 export function countries(): CountryOption[] {
   ensureSeeded();
@@ -69,7 +71,18 @@ export function insurers(countryCode: string, product: string): InsurerOption[] 
   );
   return rows.map((i) => {
     const a = latestScoredAudit(i.id, product);
-    return { id: i.id, slug: i.slug, name: i.name, color: i.logo_color, isDemo: !!i.is_demo, auditedAt: a?.finished_at ?? null, fresh: isFresh(a), overall: a?.overall ?? null };
+    return {
+      id: i.id,
+      slug: i.slug,
+      name: i.name,
+      color: i.logo_color,
+      isDemo: !!i.is_demo,
+      auditedAt: a?.finished_at ?? null,
+      fresh: isFresh(a),
+      overall: a?.overall ?? null,
+      group: i.parent_group,
+      blocker: auditBlocker(i, product, a),
+    };
   });
 }
 
@@ -80,4 +93,12 @@ export function insurerBySlug(countryCode: string, slug: string): InsurerRow | u
 
 export function personaFor(countryCode: string, product: string): string | undefined {
   return get<{ id: string }>(`SELECT id FROM personas WHERE country_code = ? AND product_line_id = ? ORDER BY version DESC, id DESC LIMIT 1`, countryCode, product)?.id;
+}
+
+/** Why a comparison involving this insurer can't start, or null if it can. */
+export function auditBlocker(insurer: InsurerRow, product: string, audit = latestScoredAudit(insurer.id, product)): string | null {
+  if (isFresh(audit)) return null;
+  if (!insurer.audit_allowed) return "not yet cleared for automated audits";
+  if (!personaFor(insurer.country_code, product)) return "no test persona for this market yet";
+  return null;
 }

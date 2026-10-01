@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS insurers (
   -- Legal gate: audits only run when an admin has cleared the insurer's site terms.
   audit_allowed INTEGER NOT NULL DEFAULT 0,
   is_demo INTEGER NOT NULL DEFAULT 0,
+  parent_group TEXT,
   UNIQUE (country_code, slug)
 );
 CREATE TABLE IF NOT EXISTS insurer_products (
@@ -133,6 +134,12 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS jobs_status ON jobs (status, id);
 `;
 
+// Columns added after the first release, for databases created before them.
+function migrate(conn: DatabaseSync) {
+  const cols = conn.prepare(`PRAGMA table_info(insurers)`).all().map((c) => c.name);
+  if (!cols.includes("parent_group")) conn.exec(`ALTER TABLE insurers ADD COLUMN parent_group TEXT`);
+}
+
 const globalForDb = globalThis as unknown as { __arenaDb?: DatabaseSync };
 
 export function db(): DatabaseSync {
@@ -141,6 +148,7 @@ export function db(): DatabaseSync {
     const conn = new DatabaseSync(path.join(DATA_DIR, "arena.db"));
     conn.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;");
     conn.exec(SCHEMA);
+    migrate(conn);
     globalForDb.__arenaDb = conn;
   }
   return globalForDb.__arenaDb;

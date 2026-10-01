@@ -101,7 +101,7 @@ export default function ArenaPicker({ countries }: { countries: CountryOption[] 
                   disabled={!p.available}
                   aria-pressed={product === p.id}
                   onClick={() => setProduct(p.id)}
-                  title={p.available ? undefined : "Fewer than two insurers audited for this product yet"}
+                  title={p.available ? undefined : "Fewer than two insurers offer this product here"}
                   className={`rounded-full border px-4 py-1.5 text-sm transition ${
                     product === p.id ? "border-accent bg-accent-soft font-medium text-accent" : "border-line hover:bg-surface-2"
                   } disabled:cursor-not-allowed disabled:opacity-40`}
@@ -131,7 +131,7 @@ export default function ArenaPicker({ countries }: { countries: CountryOption[] 
             <p className="mt-2 text-xs text-muted">
               {[byslug.get(a), byslug.get(b)]
                 .filter((i): i is InsurerOption => !!i)
-                .map((i) => `${i.name}: ${i.fresh ? `audited ${new Date(i.auditedAt!).toLocaleDateString("en-GB")}` : "needs a fresh audit (about 1 to 5 min)"}`)
+                .map((i) => `${i.name}: ${i.fresh ? `audited ${new Date(i.auditedAt!).toLocaleDateString("en-GB")}` : i.blocker ?? "needs a fresh audit (about 1 to 5 min)"}`)
                 .join(" · ")}
             </p>
           )}
@@ -170,6 +170,7 @@ function InsurerSelect(props: {
         {props.insurers.map((i) => (
           <option key={i.slug} value={i.slug} disabled={i.slug === props.other}>
             {i.name}
+            {i.group ? ` (${i.group})` : ""}
           </option>
         ))}
       </select>

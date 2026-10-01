@@ -1,13 +1,9 @@
-import { get, run, tx } from "./db";
+import { db, get, run, tx } from "./db";
 import { MOCK_SITES } from "../mock/sites";
+import { REAL_COUNTRIES, REAL_INSURERS, type CountrySeed } from "./insurerData";
 import type { Persona } from "./types";
 
-const COUNTRIES = [
-  { code: "ZZ", name: "Demo market", flag: "🧪", currency: "GBP", regulator_url: null },
-  { code: "GB", name: "United Kingdom", flag: "🇬🇧", currency: "GBP", regulator_url: "https://register.fca.org.uk/" },
-  { code: "IE", name: "Ireland", flag: "🇮🇪", currency: "EUR", regulator_url: "https://registers.centralbank.ie/" },
-  { code: "AU", name: "Australia", flag: "🇦🇺", currency: "AUD", regulator_url: "https://www.apra.gov.au/register-of-authorised-deposit-taking-institutions" },
-];
+const COUNTRIES: CountrySeed[] = [{ code: "ZZ", name: "Demo market", flag: "🧪", currency: "GBP", regulator_url: null }, ...REAL_COUNTRIES];
 
 const PRODUCTS = [
   { id: "car", name: "Car", sort: 1 },
@@ -15,27 +11,7 @@ const PRODUCTS = [
   { id: "travel", name: "Travel", sort: 3 },
   { id: "health", name: "Health", sort: 4 },
   { id: "life", name: "Life", sort: 5 },
-];
-
-/**
- * Real insurers are seeded inactive for auditing (audit_allowed = 0).
- * An admin must confirm the quote URL and clear the site's terms before any audit runs.
- */
-const REAL_INSURERS: { country: string; name: string; slug: string; url: string; color: string; products: string[] }[] = [
-  { country: "GB", name: "Aviva", slug: "aviva", url: "https://www.aviva.co.uk", color: "#ffd900", products: ["car", "home"] },
-  { country: "GB", name: "Direct Line", slug: "direct-line", url: "https://www.directline.com", color: "#e30613", products: ["car", "home"] },
-  { country: "GB", name: "Admiral", slug: "admiral", url: "https://www.admiral.com", color: "#003a70", products: ["car", "home"] },
-  { country: "GB", name: "LV=", slug: "lv", url: "https://www.lv.com", color: "#00a650", products: ["car", "home"] },
-  { country: "GB", name: "Churchill", slug: "churchill", url: "https://www.churchill.com", color: "#0f3b7d", products: ["car", "home"] },
-  { country: "GB", name: "Hastings Direct", slug: "hastings-direct", url: "https://www.hastingsdirect.com", color: "#00205b", products: ["car", "home"] },
-  { country: "IE", name: "AXA Ireland", slug: "axa", url: "https://www.axa.ie", color: "#00008f", products: ["car", "home"] },
-  { country: "IE", name: "Aviva Ireland", slug: "aviva", url: "https://www.aviva.ie", color: "#ffd900", products: ["car", "home"] },
-  { country: "IE", name: "FBD", slug: "fbd", url: "https://www.fbd.ie", color: "#005a9c", products: ["car", "home"] },
-  { country: "IE", name: "Allianz Ireland", slug: "allianz", url: "https://www.allianz.ie", color: "#003781", products: ["car", "home"] },
-  { country: "AU", name: "NRMA Insurance", slug: "nrma", url: "https://www.nrma.com.au", color: "#0060a9", products: ["car", "home"] },
-  { country: "AU", name: "AAMI", slug: "aami", url: "https://www.aami.com.au", color: "#e2001a", products: ["car", "home"] },
-  { country: "AU", name: "Budget Direct", slug: "budget-direct", url: "https://www.budgetdirect.com.au", color: "#f58220", products: ["car", "home"] },
-  { country: "AU", name: "Youi", slug: "youi", url: "https://www.youi.com.au", color: "#6d2077", products: ["car", "home"] },
+  { id: "business", name: "Business", sort: 6 },
 ];
 
 const baseDriver = {
@@ -89,16 +65,16 @@ export function seed() {
       run(`INSERT INTO product_lines (id, name, sort) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, sort = excluded.sort`, p.id, p.name, p.sort);
     }
 
-    const upsertInsurer = (country: string, slug: string, name: string, url: string, color: string, allowed: number, demo: number) => {
+    const upsertInsurer = (country: string, slug: string, name: string, url: string, color: string, allowed: number, demo: number, group: string | null = null) => {
       const existing = get<{ id: number }>(`SELECT id FROM insurers WHERE country_code = ? AND slug = ?`, country, slug);
       if (existing) {
         // Keep admin decisions (active, audit_allowed, URLs) on re-seed.
-        run(`UPDATE insurers SET name = ?, logo_color = ? WHERE id = ?`, name, color, existing.id);
+        run(`UPDATE insurers SET name = ?, logo_color = ?, parent_group = ? WHERE id = ?`, name, color, group, existing.id);
         return { id: existing.id, created: false };
       }
       const res = run(
-        `INSERT INTO insurers (slug, name, country_code, home_url, logo_color, audit_allowed, is_demo) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        slug, name, country, url, color, allowed, demo,
+        `INSERT INTO insurers (slug, name, country_code, home_url, logo_color, audit_allowed, is_demo, parent_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        slug, name, country, url, color, allowed, demo, group,
       );
       return { id: Number(res.lastInsertRowid), created: true };
     };
@@ -108,7 +84,7 @@ export function seed() {
       run(`INSERT OR IGNORE INTO insurer_products (insurer_id, product_line_id, quote_start_url) VALUES (?, 'car', ?)`, id, `/mock/${site.slug}`);
     }
     for (const r of REAL_INSURERS) {
-      const { id } = upsertInsurer(r.country, r.slug, r.name, r.url, r.color, 0, 0);
+      const { id } = upsertInsurer(r.country, r.slug, r.name, r.url, r.color, 0, 0, r.group ?? null);
       for (const p of r.products) {
         run(`INSERT OR IGNORE INTO insurer_products (insurer_id, product_line_id, quote_start_url) VALUES (?, ?, ?)`, id, p, r.url);
       }
@@ -124,10 +100,16 @@ export function seed() {
   });
 }
 
+// Bump when the seed data changes so existing databases pick it up on next start.
+const SEED_VERSION = 2;
+
 let seeded = false;
 export function ensureSeeded() {
   if (seeded) return;
-  const row = get<{ n: number }>(`SELECT COUNT(*) AS n FROM countries`);
-  if (!row || row.n === 0) seed();
+  const row = get<{ user_version: number }>(`PRAGMA user_version`);
+  if ((row?.user_version ?? 0) < SEED_VERSION) {
+    seed();
+    db().exec(`PRAGMA user_version = ${SEED_VERSION}`);
+  }
   seeded = true;
 }

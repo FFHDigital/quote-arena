@@ -42,11 +42,11 @@ The session (`src/lib/audit/session.ts`) enforces these in code, not only in the
 
 ## Real insurers
 
-UK, Irish and Australian insurers are seeded with **audits switched off**. Before ticking "Cleared for audits" in `/admin`:
+About 190 insurers in 19 markets are listed in `src/lib/insurerData.ts`, including Fairfax companies (GIG in the Gulf and Jordan, Meridional, Southbridge, Falcon, Pacific Insurance, Bryte, Colonnade, Eurolife FFH, Northbridge, Crum & Forster, Zenith, Allied World), marked "(Fairfax)" in the picker. They appear in the dropdowns straight away but are seeded with **audits switched off**, so a comparison shows why it can't run yet. Bump `SEED_VERSION` in `src/lib/seed.ts` after editing the list. Before ticking "Cleared for audits" in `/admin`:
 
 1. Check the insurer's website terms allow automated access.
 2. Confirm the quote start URL for each product.
-3. Review the market's persona in `src/lib/seed.ts`. The Irish personas have a placeholder phone number (`REVIEW-BEFORE-USE`) that must be replaced with a reserved test number.
+3. Add or review the market's persona in `src/lib/seed.ts`. Only UK, Irish and Australian personas exist; the Irish ones have a placeholder phone number (`REVIEW-BEFORE-USE`) that must be replaced with a reserved test number.
 
 Legal sign-off per country is still an open question in the PRD.
 
