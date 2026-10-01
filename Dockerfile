@@ -6,7 +6,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm install --no-audit --no-fund && npx playwright install --with-deps --only-shell chromium && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \n    && npm install --no-audit --no-fund && npx playwright install --with-deps --only-shell chromium && rm -rf /var/lib/apt/lists/*
 RUN npm install -g --no-audit --no-fund @anthropic-ai/claude-code @openai/codex && claude --version && codex --version
 
 COPY . .
