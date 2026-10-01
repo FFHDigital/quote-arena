@@ -16,7 +16,18 @@ npm run worker                    # terminal 2: runs audits and verdicts
 
 Open http://localhost:3000, choose **Demo market → Car**, and compare two insurers. The first comparison audits both insurers (a few seconds each for the demo sites), then shows the verdict. `npm run audit:demo` queues a chain of comparisons across all five demo insurers so the leaderboard fills up.
 
-Without `ANTHROPIC_API_KEY` everything still runs: a rule-based driver fills the forms, and verdicts are decided from the scores. With a key, the Claude agent drives the browser, Claude scores the judged criteria, and the pairwise judge runs in both orders.
+## Choosing the AI
+
+`ARENA_LLMS` lists the AIs offered in the picker, default first (for example `claude-cli,codex-cli`). Each AI keeps its own audits and verdicts.
+
+| Mode | How it calls the model | Login |
+| --- | --- | --- |
+| `claude-cli` | `claude -p` with a JSON schema, one call per page step, then scorer and judge calls | `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or a local `claude` login |
+| `codex-cli` | `codex exec --output-schema`, same pattern | `~/.codex/auth.json` (ChatGPT login); in the container it comes from `CODEX_AUTH_JSON_B64` |
+| `api` | Anthropic Messages API with tool use | `ANTHROPIC_API_KEY` (billed per token) |
+| `rules` | No AI: rule-based driver and score-based verdicts | none |
+
+The CLI modes use the subscription's usage limits instead of per-token billing; a real-insurer comparison makes roughly 40 to 80 calls. Set `ARENA_CLAUDE_CLI_MODEL` (default `sonnet`) or `ARENA_CODEX_CLI_MODEL` to change models.
 
 ## How it fits together
 
@@ -70,7 +81,10 @@ Live: https://quote-arena.calmmeadow-31431fb2.westeurope.azurecontainerapps.io
 | Environment | `cae-quote-arena`, Consumption profile, logs off | No Log Analytics charges |
 | App | `quote-arena`, 0.5 vCPU, 1 GiB, 0 to 1 replicas | Stays inside the monthly free grant; SQLite needs a single replica |
 | Admin | `ADMIN_TOKEN` secret | `/admin` is closed without it |
+| AI logins | `claude-token` and `codex-auth` secrets | Claude Code and Codex CLIs on subscription logins; `ARENA_LLMS=claude-cli,codex-cli` |
 | Budget | `quote-arena-1usd` | Emails if the group costs anything |
+
+Audits run from West Europe, so some regional insurer sites (for example GIG Kuwait) block the agent as a foreign visitor; that is recorded as the result.
 
 Data lives on the container's own disk, so it resets when the app scales to zero (after about 5 idle minutes). The demo insurers are re-seeded and re-audited on demand.
 
