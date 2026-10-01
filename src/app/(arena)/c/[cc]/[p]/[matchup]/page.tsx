@@ -1,0 +1,57 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { connection } from "next/server";
+import PendingCompare from "@/components/PendingCompare";
+import VerdictResult from "@/components/VerdictResult";
+import { get } from "@/lib/db";
+import { findVerdict } from "@/lib/judge";
+import { insurerBySlug, isFresh, latestScoredAudit } from "@/lib/queries";
+import { verdictView } from "@/lib/views";
+
+function parse(matchup: string) {
+  const [a, b, ...rest] = decodeURIComponent(matchup).split("-vs-");
+  return rest.length || !a || !b ? null : { a, b };
+}
+
+export async function generateMetadata({ params }: PageProps<"/c/[cc]/[p]/[matchup]">): Promise<Metadata> {
+  const { cc, matchup } = await params;
+  const m = parse(matchup);
+  const a = m && insurerBySlug(cc.toUpperCase(), m.a);
+  const b = m && insurerBySlug(cc.toUpperCase(), m.b);
+  return { title: a && b ? `${a.name} vs ${b.name} | Quote Arena` : "Quote Arena" };
+}
+
+export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[matchup]">) {
+  await connection();
+  const { cc, p, matchup } = await params;
+  const country = cc.toUpperCase();
+  const m = parse(matchup);
+  if (!m || m.a === m.b) notFound();
+  const a = insurerBySlug(country, m.a);
+  const b = insurerBySlug(country, m.b);
+  const product = get<{ name: string }>(`SELECT name FROM product_lines WHERE id = ?`, p);
+  const countryRow = get<{ name: string }>(`SELECT name FROM countries WHERE code = ?`, country);
+  if (!a || !b || !product || !countryRow) notFound();
+
+  const auditA = latestScoredAudit(a.id, p);
+  const auditB = latestScoredAudit(b.id, p);
+  const verdict = auditA && auditB && isFresh(auditA) && isFresh(auditB) ? findVerdict(auditA.id, auditB.id) : undefined;
+  const view = verdict ? verdictView(verdict.id, a.id) : null;
+
+  if (!view) {
+    return (
+      <div className="grid gap-6">
+        <div>
+          <p className="text-sm text-muted">
+            {countryRow.name} · {product.name} insurance
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+            {a.name} <span className="text-muted">vs</span> {b.name}
+          </h1>
+        </div>
+        <PendingCompare country={country} product={p} a={a.slug} b={b.slug} names={[a.name, b.name]} />
+      </div>
+    );
+  }
+  return <VerdictResult v={view} countryName={countryRow.name} productName={product.name} />;
+}

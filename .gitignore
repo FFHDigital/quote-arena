@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Quote Arena runtime data
+/data
+.next-dev.log
+.worker.log
