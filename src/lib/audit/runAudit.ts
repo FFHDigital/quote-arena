@@ -79,7 +79,14 @@ export async function runAudit(auditId: number, log: (msg: string) => void = () 
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, userAgent: USER_AGENT, locale: "en-GB" });
     const page = await ctx.newPage();
     const t0 = Date.now();
-    await page.goto(startUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    try {
+      await page.goto(startUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    } catch (err) {
+      // A site that won't load for the agent is a result, not a crash: the customer can't get a quote either.
+      recordUnreachable(auditId, startUrl, err instanceof Error ? err.message.split("\n")[0] : String(err), driver.name);
+      log("Website could not be reached");
+      return;
+    }
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     // Real sites get a polite 5 s between actions; the local demo sites don't need it.
     const delay = insurer.is_demo ? 0 : Number(process.env.ARENA_ACTION_DELAY_MS ?? 5000);
@@ -130,9 +137,34 @@ export async function runAudit(auditId: number, log: (msg: string) => void = () 
     });
   } finally {
     await browser.close();
+    if (get<{ status: string }>(`SELECT status FROM audits WHERE id = ?`, auditId)?.status === "captured") {
+      log("Scoring the journey");
+      await scoreAudit(auditId);
+      log("Audit scored");
+    }
   }
+}
 
-  log("Scoring the journey");
-  await scoreAudit(auditId);
-  log("Audit scored");
+function recordUnreachable(auditId: number, url: string, reason: string, driver: string) {
+  const metrics: AuditMetrics = {
+    outcome: "error",
+    priceText: null,
+    steps: 0,
+    clicksToStart: null,
+    fieldsTotal: 0,
+    fieldsRequired: 0,
+    fieldsPrefilled: 0,
+    lookupsUsed: 0,
+    errorsShown: 0,
+    barriers: [],
+    estimatedHumanSeconds: null,
+    pageLoadSeconds: 30,
+    mobile: { checked: false, horizontalOverflow: false, smallTapTargets: 0, formReachable: false },
+  };
+  const notes = `The website could not be reached from the audit server (${reason.replace(/^page\.goto: /, "")}).`;
+  tx(() => {
+    run(`DELETE FROM evidence WHERE audit_id = ?`, auditId);
+    run(`INSERT INTO evidence (audit_id, ref, step_no, kind, url, summary, screenshot, payload) VALUES (?, 'E1', 0, 'blocker', ?, ?, NULL, NULL)`, auditId, url, notes);
+    run(`UPDATE audits SET status = 'captured', outcome = 'error', metrics = ?, notes = ?, driver = ? WHERE id = ?`, JSON.stringify(metrics), notes, driver, auditId);
+  });
 }
