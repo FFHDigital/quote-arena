@@ -41,8 +41,13 @@ export function formFields(obs: Observation): ObservedElement[] {
 const CONTINUE = /continue|next|quote|price|calculate|submit|find|look ?up|request|create/i;
 
 /** A quote form step: two or more inputs, or one input with a button to act on it (e.g. a registration lookup). */
+const LOGIN = /password|user ?name|log ?in|sign ?in/i;
+
+/** Sign-in boxes (often on home pages) are not quote forms. */
 export function isQuoteForm(obs: Observation): boolean {
-  const inputs = formFields(obs).filter((f) => f.kind !== "checkbox");
+  const all = formFields(obs);
+  const login = all.some((f) => f.kind === "password");
+  const inputs = all.filter((f) => f.kind !== "checkbox" && f.kind !== "password" && !LOGIN.test(f.label) && !(login && /e-?mail/i.test(f.label)));
   if (inputs.length >= 2) return true;
   return inputs.length === 1 && obs.elements.some((e) => e.kind === "button" && CONTINUE.test(e.label));
 }

@@ -57,7 +57,7 @@ export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[ma
         </div>
         {blocked.length ? (
           <Card>
-            <h2 className="font-medium">This matchup can&rsquo;t be audited yet</h2>
+            <h2 className="font-medium">This matchup can&rsquo;t be audited</h2>
             <ul className="mt-2 grid list-disc gap-1 pl-5 text-sm">
               {blocked.map((x) => (
                 <li key={x.name}>
@@ -66,7 +66,7 @@ export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[ma
               ))}
             </ul>
             <p className="mt-3 text-sm text-muted">
-              Real insurers are audited only after their website terms have been checked to allow automated access. Until then you can compare insurers in the{" "}
+              An admin has switched audits off for this insurer. You can still compare insurers in the{" "}
               <Link href="/" className="text-accent hover:underline">
                 demo market
               </Link>

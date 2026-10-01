@@ -260,83 +260,93 @@ export const ruleDriver: Driver = {
     let lastSig = "";
     let errorRounds = 0;
     let submitted = 0;
+    let failures = 0;
 
     try {
       for (let round = 0; round < 40 && !session.outcome; round++) {
-        const obs = session.last;
-        const f = obs.flags;
-        if (f.priceText && submitted > 0) return finish(session, "price_shown", "Price shown after the final step.");
-        if (f.password) return finish(session, "blocked_account", "The site asks for an account (password) before any price.");
-        if (f.otp) return finish(session, "blocked_otp", "The site asks for a verification code before any price.");
+        try {
+          const obs = session.last;
+          const f = obs.flags;
+          if (f.priceText && submitted > 0) return finish(session, "price_shown", "Price shown after the final step.");
+          if (f.otp) return finish(session, "blocked_otp", "The site asks for a verification code before any price.");
 
-        const fields = formFields(obs);
-        const isForm = isQuoteForm(obs);
+          const fields = formFields(obs);
+          const isForm = isQuoteForm(obs);
 
-        if (!isForm) {
-          const links = obs.elements.filter((e) => (e.kind === "link" || e.kind === "button") && !clicked.has(e.label));
-          const pick =
-            links.find((e) => START_LINK.test(e.label)) ??
-            links.find((e) => new RegExp(`${productLine} insurance`, "i").test(e.label)) ??
-            links.find((e) => /products|insurance/i.test(e.label));
-          if (!pick) return finish(session, "no_online_quote", "No link to an online quote was found.");
-          clicked.add(pick.label);
-          await session.click(pick.id);
-          continue;
-        }
+          if (!isForm) {
+            const links = obs.elements.filter((e) => (e.kind === "link" || e.kind === "button") && !clicked.has(e.label));
+            const pick =
+              links.find((e) => START_LINK.test(e.label)) ??
+              links.find((e) => new RegExp(`${productLine} insurance`, "i").test(e.label)) ??
+              links.find((e) => /products|insurance/i.test(e.label));
+            if (!pick) {
+              if (f.password) return finish(session, "blocked_account", "The site asks for an account (password) before any price.");
+              return finish(session, "no_online_quote", "No link to an online quote was found.");
+            }
+            clicked.add(pick.label);
+            await session.click(pick.id);
+            continue;
+          }
 
-        if (f.captcha && fields.some((x) => /robot|captcha/i.test(x.label))) {
-          return finish(session, "blocked_captcha", "A CAPTCHA must be solved before continuing.");
-        }
+          if (f.password && submitted > 0) return finish(session, "blocked_account", "The journey asks for an account (password) before any price.");
+          if (f.captcha && fields.some((x) => /robot|captcha/i.test(x.label))) {
+            return finish(session, "blocked_captcha", "A CAPTCHA must be solved before continuing.");
+          }
 
-        // Fill required fields in page order, using a lookup as soon as its input is filled.
-        for (let n = 0; n < 60; n++) {
-          const current = session.last;
-          const field = formFields(current).find((x) => x.required && isEmpty(x) && !x.disabled && !attempted.has(x.id));
-          if (!field) break;
-          attempted.add(field.id);
-          const value = personaValue(field.label, persona);
-          if (field.kind === "checkbox") {
-            await session.setChecked(field.id, true);
-          } else if (field.kind === "select" || field.kind === "radio") {
-            const opts = (field.options ?? []).filter((o) => !/please select|choose/i.test(o));
-            const match = value && opts.find((o) => o.toLowerCase() === value.toLowerCase() || o.toLowerCase().includes(value.toLowerCase()) || value.toLowerCase().includes(o.toLowerCase()));
-            const fallback = opts.find((o) => o.toLowerCase() === "no") ?? opts[0];
-            if (match || fallback) await session.choose(field.id, match || fallback);
-          } else {
-            await session.fill(field.id, value ?? (field.kind === "number" ? "1" : "N/A"));
-            const at = current.elements.findIndex((e) => e.id === field.id);
-            const btn = current.elements[at + 1];
-            if (btn?.kind === "button" && LOOKUP.test(btn.label) && !clicked.has(btn.label)) {
-              clicked.add(btn.label);
-              await session.click(btn.id);
+          // Fill required fields in page order, using a lookup as soon as its input is filled.
+          for (let n = 0; n < 60; n++) {
+            const current = session.last;
+            const field = formFields(current).find((x) => x.required && isEmpty(x) && !x.disabled && !attempted.has(x.id));
+            if (!field) break;
+            attempted.add(field.id);
+            const value = personaValue(field.label, persona);
+            if (field.kind === "checkbox") {
+              await session.setChecked(field.id, true);
+            } else if (field.kind === "select" || field.kind === "radio") {
+              const opts = (field.options ?? []).filter((o) => !/please select|choose/i.test(o));
+              const match = value && opts.find((o) => o.toLowerCase() === value.toLowerCase() || o.toLowerCase().includes(value.toLowerCase()) || value.toLowerCase().includes(o.toLowerCase()));
+              const fallback = opts.find((o) => o.toLowerCase() === "no") ?? opts[0];
+              if (match || fallback) await session.choose(field.id, match || fallback);
+            } else {
+              await session.fill(field.id, value ?? (field.kind === "number" ? "1" : "N/A"));
+              const at = current.elements.findIndex((e) => e.id === field.id);
+              const btn = current.elements[at + 1];
+              if (btn?.kind === "button" && LOOKUP.test(btn.label) && !clicked.has(btn.label)) {
+                clicked.add(btn.label);
+                await session.click(btn.id);
+              }
             }
           }
-        }
 
-        // Fix invalid fields the way a person would: digits only for phones.
-        const invalid = formFields(session.last).filter((x) => x.invalid);
-        if (invalid.length) {
-          if (++errorRounds > 3) return finish(session, "gave_up", "Validation errors could not be resolved.");
-          for (const field of invalid) {
-            if (field.kind === "tel") await session.fill(field.id, field.value.replace(/\D/g, ""));
+          // Fix invalid fields the way a person would: digits only for phones.
+          const invalid = formFields(session.last).filter((x) => x.invalid);
+          if (invalid.length) {
+            if (++errorRounds > 3) return finish(session, "gave_up", "Validation errors could not be resolved.");
+            for (const field of invalid) {
+              if (field.kind === "tel") await session.fill(field.id, field.value.replace(/\D/g, ""));
+            }
           }
+
+          const primary = session.last.elements.filter((e) => e.kind === "button" && !LOOKUP.test(e.label));
+          const callback = primary.find((e) => /call ?back|call me/i.test(e.label));
+          if (callback && session.last.flags.callback) return finish(session, "callback_only", "Only a callback request form is offered; no online price.");
+          const next = primary.find((e) => PRIMARY.test(e.label)) ?? primary.at(-1);
+          if (!next) return finish(session, "gave_up", "No button to continue.");
+          if (/account|register|sign up/i.test(next.label)) return finish(session, "blocked_account", "The only way forward is to create an account.");
+
+          const sigBefore = JSON.stringify(formFields(session.last).map((x) => x.label));
+          await session.click(next.id);
+          submitted++;
+          const sigAfter = JSON.stringify(formFields(session.last).map((x) => x.label));
+          if (sigAfter === sigBefore && sigAfter === lastSig && !session.last.flags.priceText) {
+            if (++stuck >= 3) return finish(session, "gave_up", "The form would not move past this step.");
+          } else stuck = 0;
+          lastSig = sigAfter;
+        } catch (err) {
+          // One failed action shouldn't end the journey; the next round tries something else.
+          if (err instanceof LimitReached) throw err;
+          if (++failures > 4) return finish(session, "gave_up", `Page actions kept failing: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
         }
-
-        const primary = session.last.elements.filter((e) => e.kind === "button" && !LOOKUP.test(e.label));
-        const callback = primary.find((e) => /call ?back|call me/i.test(e.label));
-        if (callback && session.last.flags.callback) return finish(session, "callback_only", "Only a callback request form is offered; no online price.");
-        const next = primary.find((e) => PRIMARY.test(e.label)) ?? primary.at(-1);
-        if (!next) return finish(session, "gave_up", "No button to continue.");
-        if (/account|register|sign up/i.test(next.label)) return finish(session, "blocked_account", "The only way forward is to create an account.");
-
-        const sigBefore = JSON.stringify(formFields(session.last).map((x) => x.label));
-        await session.click(next.id);
-        submitted++;
-        const sigAfter = JSON.stringify(formFields(session.last).map((x) => x.label));
-        if (sigAfter === sigBefore && sigAfter === lastSig && !session.last.flags.priceText) {
-          if (++stuck >= 3) return finish(session, "gave_up", "The form would not move past this step.");
-        } else stuck = 0;
-        lastSig = sigAfter;
       }
       if (!session.outcome) await finish(session, "gave_up", "Stopped after 40 rounds.");
     } catch (err) {

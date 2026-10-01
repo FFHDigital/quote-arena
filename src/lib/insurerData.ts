@@ -1,6 +1,5 @@
 /**
- * Real insurers by market. Seeded with audits switched off (audit_allowed = 0):
- * an admin must confirm the quote URL and clear the site's terms before any audit runs.
+ * Real insurers by market. Seeded open for audits (audit_allowed = 1); an admin can switch one off in /admin.
  * Products: c car, h home, t travel, he health, l life, b business.
  */
 

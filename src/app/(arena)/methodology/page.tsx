@@ -23,7 +23,7 @@ export default function Methodology() {
         <ul className="mt-3 grid list-disc gap-1 pl-5 text-sm text-muted">
           <li>It never buys, applies, requests a callback, creates an account, enters a verification code or solves a CAPTCHA. Each of those is recorded as a barrier instead.</li>
           <li>It identifies itself in its user agent and waits 5 seconds between actions on real sites.</li>
-          <li>Insurers are only audited after an admin has checked their site terms.</li>
+          <li>The agent visits each insurer&apos;s public website like a customer would. An admin can switch audits off for any insurer.</li>
         </ul>
       </Card>
 

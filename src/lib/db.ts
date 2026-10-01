@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS insurers (
   licence_ref TEXT,
   logo_color TEXT NOT NULL DEFAULT '#64748b',
   active INTEGER NOT NULL DEFAULT 1,
-  -- Legal gate: audits only run when an admin has cleared the insurer's site terms.
+  -- Kill switch: audits only run while this is 1.
   audit_allowed INTEGER NOT NULL DEFAULT 0,
   is_demo INTEGER NOT NULL DEFAULT 0,
   parent_group TEXT,

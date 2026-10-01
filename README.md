@@ -42,13 +42,11 @@ The session (`src/lib/audit/session.ts`) enforces these in code, not only in the
 
 ## Real insurers
 
-About 190 insurers in 19 markets are listed in `src/lib/insurerData.ts`, including Fairfax companies (GIG in the Gulf and Jordan, Meridional, Southbridge, Falcon, Pacific Insurance, Bryte, Colonnade, Eurolife FFH, Northbridge, Crum & Forster, Zenith, Allied World), marked "(Fairfax)" in the picker. They appear in the dropdowns straight away but are seeded with **audits switched off**, so a comparison shows why it can't run yet. Bump `SEED_VERSION` in `src/lib/seed.ts` after editing the list. Before ticking "Cleared for audits" in `/admin`:
+About 190 insurers in 19 markets are listed in `src/lib/insurerData.ts`, including Fairfax companies (GIG in the Gulf and Jordan, Meridional, Southbridge, Falcon, Pacific Insurance, Bryte, Colonnade, Eurolife FFH, Northbridge, Crum & Forster, Zenith, Allied World), marked "(Fairfax)" in the picker. All are open for audits; untick "Audits on" in `/admin` to stop the agent visiting a site. Bump `SEED_VERSION` in `src/lib/seed.ts` after editing the list.
 
-1. Check the insurer's website terms allow automated access.
-2. Confirm the quote start URL for each product.
-3. Add or review the market's persona in `src/lib/seed.ts`. Only UK, Irish and Australian personas exist; the Irish ones have a placeholder phone number (`REVIEW-BEFORE-USE`) that must be replaced with a reserved test number.
+Every market has a test persona per product in `src/lib/seed.ts`. Phones use reserved fictional ranges where they exist (UK, Australia, US/Canada 555-01xx) and zero-filled local numbers elsewhere; emails use example.com.
 
-Legal sign-off per country is still an open question in the PRD.
+The rule-based driver only understands English form labels, so on most real sites it gives up early. Set `ANTHROPIC_API_KEY` to use the Claude agent, which reads any language.
 
 ## Scripts
 

@@ -24,7 +24,7 @@ export interface InsurerOption {
   blocker: string | null;
 }
 
-/** Insurers the public can pick. Ones not cleared for audits are listed but can't be compared until an admin clears them. */
+/** Insurers the public can pick. Ones with audits switched off are listed but can only be compared on existing audits. */
 const ELIGIBLE = `i.active = 1`;
 
 export function countries(): CountryOption[] {
@@ -98,7 +98,7 @@ export function personaFor(countryCode: string, product: string): string | undef
 /** Why a comparison involving this insurer can't start, or null if it can. */
 export function auditBlocker(insurer: InsurerRow, product: string, audit = latestScoredAudit(insurer.id, product)): string | null {
   if (isFresh(audit)) return null;
-  if (!insurer.audit_allowed) return "not yet cleared for automated audits";
+  if (!insurer.audit_allowed) return "switched off for audits";
   if (!personaFor(insurer.country_code, product)) return "no test persona for this market yet";
   return null;
 }

@@ -41,16 +41,82 @@ const baseDriver = {
 
 const home = { property_type: "Semi-detached house", bedrooms: "3", year_built: "1985", rebuild_cost: "250000", contents_value: "40000" };
 
-// Contact details use reserved fictional ranges (Ofcom drama numbers, ACMA 0491 570, example.com).
-const PERSONAS: Record<string, Persona & { country: string; product: string }> = {
-  "ZZ-car-v1": { country: "ZZ", product: "car", label: "35-year-old, clean licence, 2019 Ford Focus, London", fields: { ...baseDriver, phone: "07700 900123", postcode: "E1 6AN", address_line: "1 Example Street", city: "London", reg: "AB19 CDE", licence_type: "Full UK" } },
-  "GB-car-v1": { country: "GB", product: "car", label: "35-year-old, clean licence, 2019 Ford Focus, London", fields: { ...baseDriver, phone: "07700 900123", postcode: "E1 6AN", address_line: "1 Example Street", city: "London", reg: "AB19 CDE", licence_type: "Full UK" } },
-  "GB-home-v1": { country: "GB", product: "home", label: "35-year-old owner of a 3-bed semi, London", fields: { ...baseDriver, ...home, phone: "07700 900123", postcode: "E1 6AN", address_line: "1 Example Street", city: "London" } },
-  "IE-car-v1": { country: "IE", product: "car", label: "35-year-old, clean licence, 2019 Ford Focus, Dublin", fields: { ...baseDriver, phone: "REVIEW-BEFORE-USE", postcode: "D02 X285", address_line: "1 Example Street", city: "Dublin", reg: "191-D-12345", licence_type: "Full Irish", excess: "€250" } },
-  "IE-home-v1": { country: "IE", product: "home", label: "35-year-old owner of a 3-bed semi, Dublin", fields: { ...baseDriver, ...home, phone: "REVIEW-BEFORE-USE", postcode: "D02 X285", address_line: "1 Example Street", city: "Dublin" } },
-  "AU-car-v1": { country: "AU", product: "car", label: "35-year-old, clean licence, 2019 Ford Focus, Sydney", fields: { ...baseDriver, phone: "0491 570 006", postcode: "2000", address_line: "1 Example Street", city: "Sydney", reg: "ABC12D", licence_type: "Full Australian", excess: "$500" } },
-  "AU-home-v1": { country: "AU", product: "home", label: "35-year-old owner of a 3-bed house, Sydney", fields: { ...baseDriver, ...home, phone: "0491 570 006", postcode: "2000", address_line: "1 Example Street", city: "Sydney" } },
+// Where a reserved fictional range exists it is used (Ofcom drama numbers, ACMA 0491 570, NANP 555-01xx).
+// Elsewhere the phone is a zero-filled number in local format, which no real person can be reached on.
+interface Market {
+  city: string;
+  postcode: string;
+  phone: string;
+  reg: string;
+  licence: string;
+  money: string;
+  nationality: string;
+}
+
+const MARKETS: Record<string, Market> = {
+  ZZ: { city: "London", postcode: "E1 6AN", phone: "07700 900123", reg: "AB19 CDE", licence: "Full UK", money: "£", nationality: "British" },
+  GB: { city: "London", postcode: "E1 6AN", phone: "07700 900123", reg: "AB19 CDE", licence: "Full UK", money: "£", nationality: "British" },
+  IE: { city: "Dublin", postcode: "D02 X285", phone: "087 000 0000", reg: "191-D-12345", licence: "Full Irish", money: "€", nationality: "Irish" },
+  AU: { city: "Sydney", postcode: "2000", phone: "0491 570 006", reg: "ABC12D", licence: "Full Australian", money: "$", nationality: "Australian" },
+  US: { city: "Columbus, OH", postcode: "43215", phone: "614-555-0123", reg: "ABC1234", licence: "Full US", money: "$", nationality: "American" },
+  CA: { city: "Toronto, ON", postcode: "M5V 2T6", phone: "416-555-0123", reg: "ABCD 123", licence: "Full G licence", money: "$", nationality: "Canadian" },
+  AR: { city: "Buenos Aires", postcode: "C1001", phone: "11 0000-0000", reg: "AB123CD", licence: "Licencia de conducir", money: "$", nationality: "Argentina" },
+  CL: { city: "Santiago", postcode: "8320000", phone: "9 0000 0000", reg: "ABCD12", licence: "Clase B", money: "$", nationality: "Chilena" },
+  KW: { city: "Kuwait City", postcode: "13001", phone: "5000 0000", reg: "12/34567", licence: "Kuwaiti licence", money: "KWD ", nationality: "Kuwaiti" },
+  AE: { city: "Dubai", postcode: "00000", phone: "050 000 0000", reg: "A 12345", licence: "UAE licence", money: "AED ", nationality: "British" },
+  BH: { city: "Manama", postcode: "317", phone: "3000 0000", reg: "123456", licence: "Bahraini licence", money: "BHD ", nationality: "British" },
+  SA: { city: "Riyadh", postcode: "11564", phone: "050 000 0000", reg: "ABC 1234", licence: "Saudi licence", money: "SAR ", nationality: "British" },
+  JO: { city: "Amman", postcode: "11118", phone: "079 000 0000", reg: "12-34567", licence: "Jordanian licence", money: "JOD ", nationality: "British" },
+  HK: { city: "Hong Kong", postcode: "000000", phone: "5000 0000", reg: "AB 1234", licence: "Full HK", money: "HK$", nationality: "British" },
+  ZA: { city: "Johannesburg", postcode: "2001", phone: "060 000 0000", reg: "AB 12 CD GP", licence: "Code B", money: "R", nationality: "South African" },
+  MY: { city: "Kuala Lumpur", postcode: "50450", phone: "012-000 0000", reg: "WAB 1234", licence: "Competent Driving Licence", money: "RM", nationality: "Malaysian" },
+  TH: { city: "Bangkok", postcode: "10330", phone: "080 000 0000", reg: "1กข 1234", licence: "Thai licence", money: "฿", nationality: "Thai" },
+  CZ: { city: "Praha", postcode: "110 00", phone: "600 000 000", reg: "1AB 2345", licence: "Skupina B", money: "Kč ", nationality: "Česká" },
+  CN: { city: "Shanghai", postcode: "200000", phone: "130 0000 0000", reg: "沪A12345", licence: "C1", money: "¥", nationality: "Chinese" },
+  GR: { city: "Athens", postcode: "105 57", phone: "690 000 0000", reg: "ΙΚΧ 1234", licence: "Category B", money: "€", nationality: "Greek" },
 };
+
+const PRODUCT_FIELDS: Record<string, { label: (city: string) => string; fields: Record<string, string> }> = {
+  car: { label: (c) => `35-year-old, clean licence, 2019 Ford Focus, ${c}`, fields: {} },
+  home: { label: (c) => `35-year-old owner of a 3-bed house, ${c}`, fields: home },
+  travel: {
+    label: (c) => `35-year-old, one-week single trip from ${c}`,
+    fields: { destination: "Spain", trip_type: "Single trip", travellers: "1", departure_offset_days: "30", trip_length_days: "7", pre_existing_conditions: "No" },
+  },
+  health: { label: (c) => `35-year-old non-smoker, individual cover, ${c}`, fields: { smoker: "No", height_cm: "178", weight_kg: "75", pre_existing_conditions: "No", cover_for: "Just me" } },
+  life: { label: (c) => `35-year-old non-smoker, 20-year term cover, ${c}`, fields: { smoker: "No", term_years: "20", cover_amount: "250000", height_cm: "178", weight_kg: "75" } },
+  business: {
+    label: (c) => `Small IT consultancy, 5 staff, ${c}`,
+    fields: { business_name: "Example Consulting", trade: "IT consultant", employees: "5", turnover: "500000", years_trading: "5", cover: "Public liability" },
+  },
+};
+
+const PERSONAS: Record<string, Persona & { country: string; product: string }> = Object.fromEntries(
+  Object.entries(MARKETS).flatMap(([country, m]) =>
+    Object.entries(PRODUCT_FIELDS)
+      .filter(([product]) => country !== "ZZ" || product === "car")
+      .map(([product, p]) => [
+        `${country}-${product}-v1`,
+        {
+          country,
+          product,
+          label: p.label(m.city),
+          fields: {
+            ...baseDriver,
+            ...p.fields,
+            phone: m.phone,
+            postcode: m.postcode,
+            address_line: "1 Example Street",
+            city: m.city,
+            reg: m.reg,
+            licence_type: m.licence,
+            nationality: m.nationality,
+            excess: `${m.money}250`,
+          },
+        },
+      ]),
+  ),
+);
 
 export function seed() {
   tx(() => {
@@ -84,7 +150,7 @@ export function seed() {
       run(`INSERT OR IGNORE INTO insurer_products (insurer_id, product_line_id, quote_start_url) VALUES (?, 'car', ?)`, id, `/mock/${site.slug}`);
     }
     for (const r of REAL_INSURERS) {
-      const { id } = upsertInsurer(r.country, r.slug, r.name, r.url, r.color, 0, 0, r.group ?? null);
+      const { id } = upsertInsurer(r.country, r.slug, r.name, r.url, r.color, 1, 0, r.group ?? null);
       for (const p of r.products) {
         run(`INSERT OR IGNORE INTO insurer_products (insurer_id, product_line_id, quote_start_url) VALUES (?, ?, ?)`, id, p, r.url);
       }
@@ -101,14 +167,17 @@ export function seed() {
 }
 
 // Bump when the seed data changes so existing databases pick it up on next start.
-const SEED_VERSION = 2;
+const SEED_VERSION = 3;
 
 let seeded = false;
 export function ensureSeeded() {
   if (seeded) return;
   const row = get<{ user_version: number }>(`PRAGMA user_version`);
-  if ((row?.user_version ?? 0) < SEED_VERSION) {
+  const version = row?.user_version ?? 0;
+  if (version < SEED_VERSION) {
     seed();
+    // v3: real insurers are open for audits by default.
+    if (version > 0 && version < 3) run(`UPDATE insurers SET audit_allowed = 1 WHERE is_demo = 0`);
     db().exec(`PRAGMA user_version = ${SEED_VERSION}`);
   }
   seeded = true;

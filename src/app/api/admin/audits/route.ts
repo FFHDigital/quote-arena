@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return Response.json({ error: "Expected { insurerId, product }." }, { status: 400 });
   const i = get<{ audit_allowed: number }>(`SELECT audit_allowed FROM insurers WHERE id = ?`, parsed.data.insurerId);
   if (!i) return Response.json({ error: "Insurer not found." }, { status: 404 });
-  if (!i.audit_allowed) return Response.json({ error: "Clear this insurer for audits first (check its site terms)." }, { status: 409 });
+  if (!i.audit_allowed) return Response.json({ error: "Audits are switched off for this insurer." }, { status: 409 });
   const jobId = enqueue("audit", parsed.data);
   return Response.json({ jobId }, { status: 202 });
 }

@@ -163,6 +163,17 @@ export class AuditSession {
     if (Date.now() - this.started > MAX_MS) throw new LimitReached("Stopped after 20 minutes.");
   }
 
+  private async dismissOverlays() {
+    for (const name of [/reject all|only (necessary|essential)|decline/i, /accept|agree|got it|^ok$|close|dismiss/i]) {
+      const btn = this.page.getByRole("button", { name }).first();
+      if (await btn.isVisible().catch(() => false)) {
+        await btn.click({ timeout: 3000 }).catch(() => {});
+        return;
+      }
+    }
+    await this.page.keyboard.press("Escape").catch(() => {});
+  }
+
   private locate(id: string) {
     return this.page.locator(`[data-arena-id="${id}"]`).first();
   }
@@ -262,7 +273,13 @@ export class AuditSession {
     const before = this.last;
     const urlBefore = this.page.url();
     const beforeForm = this.steps === 0;
-    await this.locate(id).click({ timeout: 8000 });
+    try {
+      await this.locate(id).click({ timeout: 8000 });
+    } catch {
+      // Usually a cookie banner or chat widget is covering the element.
+      await this.dismissOverlays();
+      await this.locate(id).click({ timeout: 5000, force: true });
+    }
     this.clicks++;
     await this.settle();
     const host = new URL(this.page.url()).host;

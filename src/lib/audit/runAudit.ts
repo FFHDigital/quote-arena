@@ -61,7 +61,7 @@ export async function runAudit(auditId: number, log: (msg: string) => void = () 
   const audit = get<AuditRow>(`SELECT * FROM audits WHERE id = ?`, auditId);
   if (!audit) throw new Error(`Audit ${auditId} not found`);
   const insurer = get<InsurerRow>(`SELECT * FROM insurers WHERE id = ?`, audit.insurer_id)!;
-  if (!insurer.audit_allowed) throw new Error(`${insurer.name} has not been cleared for automated audits.`);
+  if (!insurer.audit_allowed) throw new Error(`${insurer.name} has audits switched off.`);
   const product = get<{ quote_start_url: string }>(`SELECT quote_start_url FROM insurer_products WHERE insurer_id = ? AND product_line_id = ?`, insurer.id, audit.product_line_id);
   if (!product) throw new Error(`${insurer.name} has no ${audit.product_line_id} product.`);
   const personaRow = get<{ data: string }>(`SELECT data FROM personas WHERE id = ?`, audit.persona_id);

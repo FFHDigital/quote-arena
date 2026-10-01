@@ -125,7 +125,7 @@ export default function AdminConsole() {
                 {countries.map((c) => <option key={c}>{c}</option>)}
               </select>
             </label>
-            <span className="text-muted">Only tick &ldquo;Cleared for audits&rdquo; after checking the insurer&apos;s website terms allow automated access.</span>
+            <span className="text-muted">Untick &ldquo;Audits on&rdquo; to stop the agent visiting an insurer&apos;s site.</span>
           </div>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface">
             <table className="w-full min-w-[760px] text-sm">
@@ -133,7 +133,7 @@ export default function AdminConsole() {
                 <tr className="text-left text-xs text-muted">
                   <th className="px-4 py-3 font-medium">Insurer</th>
                   <th className="px-3 py-3 font-medium">Active</th>
-                  <th className="px-3 py-3 font-medium">Cleared for audits</th>
+                  <th className="px-3 py-3 font-medium">Audits on</th>
                   <th className="px-3 py-3 font-medium">Last audit</th>
                   <th className="px-4 py-3 font-medium">Run audit</th>
                 </tr>
@@ -146,7 +146,7 @@ export default function AdminConsole() {
                       <a href={i.home_url} target="_blank" rel="noreferrer" className="block truncate text-xs text-accent">{i.home_url}</a>
                     </td>
                     <td className="px-3 py-2.5"><input type="checkbox" aria-label={`${i.name} active`} checked={!!i.active} onChange={(e) => patch(i.id, { active: e.target.checked })} /></td>
-                    <td className="px-3 py-2.5"><input type="checkbox" aria-label={`${i.name} cleared for audits`} checked={!!i.audit_allowed} onChange={(e) => patch(i.id, { auditAllowed: e.target.checked })} /></td>
+                    <td className="px-3 py-2.5"><input type="checkbox" aria-label={`Audits on for ${i.name}`} checked={!!i.audit_allowed} onChange={(e) => patch(i.id, { auditAllowed: e.target.checked })} /></td>
                     <td className="px-3 py-2.5 text-muted">{i.last_audit ? new Date(i.last_audit).toLocaleString("en-GB") : "never"}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex flex-wrap gap-1">
