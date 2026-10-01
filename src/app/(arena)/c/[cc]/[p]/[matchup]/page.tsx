@@ -76,7 +76,7 @@ export default async function ComparePage({ params, searchParams }: PageProps<"/
             </p>
           </Card>
         ) : (
-          <PendingCompare country={country} product={p} a={a.slug} b={b.slug} llm={llm} names={[a.name, b.name]} />
+          <PendingCompare country={country} product={p} a={m.a} b={m.b} llm={llm} names={[a.name, b.name]} />
         )}
       </div>
     );
