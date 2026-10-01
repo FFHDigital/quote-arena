@@ -53,6 +53,8 @@ export default function ArenaPicker({ countries, modes }: { countries: CountryOp
 
   const ready = country && product && a && b && a !== b;
   const byslug = useMemo(() => new Map(insurers.map((i) => [i.slug, i])), [insurers]);
+  // In a group market (e.g. Fairfax) every option shares the group, so the tag adds nothing.
+  const showGroup = new Set(insurers.map((i) => i.group)).size > 1;
 
   function random() {
     if (insurers.length < 2) return;
@@ -124,9 +126,9 @@ export default function ArenaPicker({ countries, modes }: { countries: CountryOp
             </button>
           </div>
           <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
-            <InsurerSelect id="insurer-a" label="First insurer" value={a} other={b} onChange={setA} insurers={insurers} loading={loading} />
+            <InsurerSelect id="insurer-a" label="First insurer" value={a} other={b} onChange={setA} insurers={insurers} loading={loading} showGroup={showGroup} />
             <span className="text-center text-sm font-semibold text-muted">vs</span>
-            <InsurerSelect id="insurer-b" label="Second insurer" value={b} other={a} onChange={setB} insurers={insurers} loading={loading} />
+            <InsurerSelect id="insurer-b" label="Second insurer" value={b} other={a} onChange={setB} insurers={insurers} loading={loading} showGroup={showGroup} />
           </div>
           {(byslug.get(a) || byslug.get(b)) && (
             <p className="mt-2 text-xs text-muted">
@@ -182,6 +184,7 @@ function InsurerSelect(props: {
   onChange: (v: string) => void;
   insurers: InsurerOption[];
   loading: boolean;
+  showGroup: boolean;
 }) {
   const current = props.insurers.find((i) => i.slug === props.value);
   return (
@@ -195,7 +198,7 @@ function InsurerSelect(props: {
         {props.insurers.map((i) => (
           <option key={i.slug} value={i.slug} disabled={i.slug === props.other}>
             {i.name}
-            {i.group ? ` (${i.group})` : ""}
+            {props.showGroup && i.group ? ` (${i.group})` : ""}
           </option>
         ))}
       </select>

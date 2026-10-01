@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Card, InsurerMark } from "@/components/ui";
 import { all } from "@/lib/db";
-import { countries, products } from "@/lib/queries";
+import { countries, marketFilter, marketSlug, products } from "@/lib/queries";
 import { leaderboard } from "@/lib/views";
 
 export const metadata: Metadata = { title: "Leaderboard | Quote Arena" };
@@ -16,13 +16,14 @@ export default async function LeaderboardPage({ searchParams }: PageProps<"/lead
   const prods = products(country).filter((p) => p.available);
   const product = typeof sp.product === "string" ? sp.product : (prods[0]?.id ?? "car");
   const rows = leaderboard(country, product);
-  const recent = all<{ id: number; a: string; b: string; sa: string; sb: string; winner: string }>(
-    `SELECT v.id, ia.name AS a, ib.name AS b, ia.slug AS sa, ib.slug AS sb, v.winner
+  const m = marketFilter(country, "ia");
+  const recent = all<{ id: number; a: string; b: string; sa: string; sb: string; ca: string; cb: string; winner: string }>(
+    `SELECT v.id, ia.name AS a, ib.name AS b, ia.slug AS sa, ib.slug AS sb, ia.country_code AS ca, ib.country_code AS cb, v.winner
      FROM verdicts v JOIN audits aa ON aa.id = v.audit_a_id JOIN insurers ia ON ia.id = aa.insurer_id
      JOIN audits ab ON ab.id = v.audit_b_id JOIN insurers ib ON ib.id = ab.insurer_id
-     WHERE ia.country_code = ? AND aa.product_line_id = ? ORDER BY v.id DESC LIMIT 8`,
-    country, product,
-  );
+     WHERE ${m.sql} AND aa.product_line_id = ? ORDER BY v.id DESC LIMIT 8`,
+    m.param, product,
+  ).map((v) => ({ ...v, sa: marketSlug(country, { slug: v.sa, country_code: v.ca }), sb: marketSlug(country, { slug: v.sb, country_code: v.cb }) }));
 
   return (
     <div className="grid gap-6">

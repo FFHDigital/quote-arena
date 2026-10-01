@@ -74,6 +74,15 @@ const MARKETS: Record<string, Market> = {
   CZ: { city: "Praha", postcode: "110 00", phone: "600 000 000", reg: "1AB 2345", licence: "Skupina B", money: "Kč ", nationality: "Česká" },
   CN: { city: "Shanghai", postcode: "200000", phone: "130 0000 0000", reg: "沪A12345", licence: "C1", money: "¥", nationality: "Chinese" },
   GR: { city: "Athens", postcode: "105 57", phone: "690 000 0000", reg: "ΙΚΧ 1234", licence: "Category B", money: "€", nationality: "Greek" },
+  UA: { city: "Kyiv", postcode: "01001", phone: "050 000 0000", reg: "AA 1234 BB", licence: "Category B", money: "₴", nationality: "Ukrainian" },
+  ID: { city: "Jakarta", postcode: "10110", phone: "0812 0000 0000", reg: "B 1234 ABC", licence: "SIM A", money: "Rp", nationality: "Indonesian" },
+  BR: { city: "São Paulo", postcode: "01000-000", phone: "(11) 90000-0000", reg: "ABC1D23", licence: "Categoria B", money: "R$", nationality: "Brasileira" },
+  LK: { city: "Colombo", postcode: "00100", phone: "070 000 0000", reg: "WP CAB-1234", licence: "Light vehicle", money: "Rs ", nationality: "Sri Lankan" },
+  UY: { city: "Montevideo", postcode: "11000", phone: "090 000 000", reg: "SAB 1234", licence: "Categoría A", money: "$", nationality: "Uruguaya" },
+  CO: { city: "Bogotá", postcode: "110111", phone: "300 000 0000", reg: "ABC123", licence: "B1", money: "$", nationality: "Colombiana" },
+  IN: { city: "Mumbai", postcode: "400001", phone: "90000 00000", reg: "MH01AB1234", licence: "LMV", money: "₹", nationality: "Indian" },
+  VN: { city: "Hanoi", postcode: "100000", phone: "090 000 0000", reg: "29A-123.45", licence: "B2", money: "₫", nationality: "Vietnamese" },
+  FR: { city: "Paris", postcode: "75001", phone: "06 00 00 00 00", reg: "AB-123-CD", licence: "Permis B", money: "€", nationality: "Française" },
 };
 
 const PRODUCT_FIELDS: Record<string, { label: (city: string) => string; fields: Record<string, string> }> = {
@@ -122,9 +131,9 @@ export function seed() {
   tx(() => {
     for (const c of COUNTRIES) {
       run(
-        `INSERT INTO countries (code, name, flag, currency, regulator_url) VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(code) DO UPDATE SET name = excluded.name, flag = excluded.flag, currency = excluded.currency, regulator_url = excluded.regulator_url`,
-        c.code, c.name, c.flag, c.currency, c.regulator_url,
+        `INSERT INTO countries (code, name, flag, currency, regulator_url, enabled) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(code) DO UPDATE SET name = excluded.name, flag = excluded.flag, currency = excluded.currency, regulator_url = excluded.regulator_url, enabled = excluded.enabled`,
+        c.code, c.name, c.flag, c.currency, c.regulator_url, c.enabled === false ? 0 : 1,
       );
     }
     for (const p of PRODUCTS) {
@@ -167,7 +176,7 @@ export function seed() {
 }
 
 // Bump when the seed data changes so existing databases pick it up on next start.
-const SEED_VERSION = 3;
+const SEED_VERSION = 4;
 
 let seeded = false;
 export function ensureSeeded() {

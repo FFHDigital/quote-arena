@@ -1,6 +1,7 @@
 import { all, get } from "./db";
 import { AUDIT_TTL_DAYS } from "./rubric";
 import { driverName, type LlmMode } from "./llm";
+import { GROUP_MARKETS } from "./insurerData";
 import { ensureSeeded } from "./seed";
 import type { AuditRow, InsurerRow } from "./types";
 
@@ -28,26 +29,44 @@ export interface InsurerOption {
 /** Insurers the public can pick. Ones with audits switched off are listed but can only be compared on existing audits. */
 const ELIGIBLE = `i.active = 1`;
 
+/**
+ * A market is a country code, or a group code (e.g. FX = every Fairfax company in any country).
+ * In a group market insurer slugs carry their country ("ca-northbridge-insurance") so they stay unique.
+ */
+export function marketFilter(code: string, alias = "i"): { sql: string; param: string } {
+  const group = GROUP_MARKETS[code];
+  return group ? { sql: `${alias}.parent_group = ?`, param: group } : { sql: `${alias}.country_code = ?`, param: code };
+}
+
+export function marketSlug(code: string, insurer: { slug: string; country_code: string }): string {
+  return GROUP_MARKETS[code] ? `${insurer.country_code.toLowerCase()}-${insurer.slug}` : insurer.slug;
+}
+
+const GROUP_CASE = Object.entries(GROUP_MARKETS)
+  .map(([code, group]) => `WHEN '${code}' THEN '${group}'`)
+  .join(" ");
+
 export function countries(): CountryOption[] {
   ensureSeeded();
   return all<CountryOption>(
     `SELECT c.code, c.name, c.flag FROM countries c
      WHERE c.enabled = 1 AND EXISTS (
        SELECT 1 FROM insurer_products ip JOIN insurers i ON i.id = ip.insurer_id
-       WHERE i.country_code = c.code AND ${ELIGIBLE}
+       WHERE (i.country_code = c.code OR i.parent_group = (CASE c.code ${GROUP_CASE} END)) AND ${ELIGIBLE}
        GROUP BY ip.product_line_id HAVING COUNT(*) >= 2)
-     ORDER BY c.code = 'ZZ' DESC, c.name`,
+     ORDER BY c.code = 'ZZ' DESC, c.code IN (${Object.keys(GROUP_MARKETS).map((c) => `'${c}'`).join(", ") || "''"}) DESC, c.name`,
   );
 }
 
 export function products(countryCode: string): { id: string; name: string; available: boolean }[] {
   ensureSeeded();
+  const m = marketFilter(countryCode);
   return all<{ id: string; name: string; n: number }>(
     `SELECT p.id, p.name, (
        SELECT COUNT(*) FROM insurer_products ip JOIN insurers i ON i.id = ip.insurer_id
-       WHERE ip.product_line_id = p.id AND i.country_code = ? AND ${ELIGIBLE}) AS n
+       WHERE ip.product_line_id = p.id AND ${m.sql} AND ${ELIGIBLE}) AS n
      FROM product_lines p ORDER BY p.sort`,
-    countryCode,
+    m.param,
   ).map((p) => ({ id: p.id, name: p.name, available: p.n >= 2 }));
 }
 
@@ -72,17 +91,20 @@ export function isFresh(audit: AuditRow | undefined): boolean {
 
 export function insurers(countryCode: string, product: string, mode?: LlmMode): InsurerOption[] {
   ensureSeeded();
-  const rows = all<InsurerRow>(
-    `SELECT i.* FROM insurers i JOIN insurer_products ip ON ip.insurer_id = i.id
-     WHERE i.country_code = ? AND ip.product_line_id = ? AND ${ELIGIBLE} ORDER BY i.name`,
-    countryCode, product,
+  const m = marketFilter(countryCode);
+  const group = !!GROUP_MARKETS[countryCode];
+  const rows = all<InsurerRow & { flag: string }>(
+    `SELECT i.*, c.flag FROM insurers i JOIN insurer_products ip ON ip.insurer_id = i.id JOIN countries c ON c.code = i.country_code
+     WHERE ${m.sql} AND ip.product_line_id = ? AND ${ELIGIBLE} ORDER BY ${group ? "c.name, " : ""}i.name`,
+    m.param, product,
   );
   return rows.map((i) => {
     const a = latestScoredAudit(i.id, product, mode);
     return {
       id: i.id,
-      slug: i.slug,
-      name: i.name,
+      slug: marketSlug(countryCode, i),
+      // In a group market the flag shows which country each company is in.
+      name: group ? `${i.flag} ${i.name}` : i.name,
       color: i.logo_color,
       isDemo: !!i.is_demo,
       auditedAt: a?.finished_at ?? null,
@@ -96,6 +118,12 @@ export function insurers(countryCode: string, product: string, mode?: LlmMode): 
 
 export function insurerBySlug(countryCode: string, slug: string): InsurerRow | undefined {
   ensureSeeded();
+  const group = GROUP_MARKETS[countryCode];
+  if (group) {
+    const m = /^([a-z]{2})-(.+)$/.exec(slug);
+    if (!m) return undefined;
+    return get<InsurerRow>(`SELECT * FROM insurers WHERE country_code = ? AND slug = ? AND parent_group = ?`, m[1].toUpperCase(), m[2], group);
+  }
   return get<InsurerRow>(`SELECT * FROM insurers WHERE country_code = ? AND slug = ?`, countryCode, slug);
 }
 

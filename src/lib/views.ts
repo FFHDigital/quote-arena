@@ -1,4 +1,5 @@
 import { all, get } from "./db";
+import { marketFilter, marketSlug } from "./queries";
 import { CRITERIA } from "./rubric";
 import { ensureSeeded } from "./seed";
 import type { AuditMetrics, AuditRow, AuditScores, CriterionKey, EvidenceRow, InsurerRow, Persona, VerdictCriterion, VerdictRow } from "./types";
@@ -134,12 +135,13 @@ export interface LeaderboardRow {
 
 export function leaderboard(country: string, product: string): LeaderboardRow[] {
   ensureSeeded();
-  const rows = all<{ id: number; name: string; slug: string; logo_color: string; elo: number; matches: number; wins: number; ties: number }>(
-    `SELECT i.id, i.name, i.slug, i.logo_color, r.elo, r.matches, r.wins, r.ties
+  const m = marketFilter(country);
+  const rows = all<{ id: number; name: string; slug: string; country_code: string; logo_color: string; elo: number; matches: number; wins: number; ties: number }>(
+    `SELECT i.id, i.name, i.slug, i.country_code, i.logo_color, r.elo, r.matches, r.wins, r.ties
      FROM ratings r JOIN insurers i ON i.id = r.insurer_id
-     WHERE i.country_code = ? AND r.product_line_id = ? AND i.active = 1
+     WHERE ${m.sql} AND r.product_line_id = ? AND i.active = 1
      ORDER BY r.elo DESC`,
-    country, product,
+    m.param, product,
   );
   return rows.map((r, n) => {
     const audit = get<AuditRow>(
@@ -156,7 +158,7 @@ export function leaderboard(country: string, product: string): LeaderboardRow[] 
       rank: n + 1,
       insurerId: r.id,
       name: r.name,
-      slug: r.slug,
+      slug: marketSlug(country, r),
       color: r.logo_color,
       elo: Math.round(r.elo),
       matches: r.matches,

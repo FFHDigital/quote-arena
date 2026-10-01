@@ -9,7 +9,12 @@ export interface CountrySeed {
   flag: string;
   currency: string;
   regulator_url: string | null;
+  /** Hidden markets only hold companies shown through a group market (e.g. Fairfax). */
+  enabled?: boolean;
 }
+
+/** Pseudo-countries that list one parent group's companies from every country. */
+export const GROUP_MARKETS: Record<string, string> = { FX: "Fairfax" };
 
 export const REAL_COUNTRIES: CountrySeed[] = [
   { code: "AR", name: "Argentina", flag: "🇦🇷", currency: "ARS", regulator_url: "https://www.argentina.gob.ar/superintendencia-de-seguros" },
@@ -31,6 +36,17 @@ export const REAL_COUNTRIES: CountrySeed[] = [
   { code: "US", name: "United States", flag: "🇺🇸", currency: "USD", regulator_url: "https://content.naic.org/" },
   { code: "GB", name: "United Kingdom", flag: "🇬🇧", currency: "GBP", regulator_url: "https://register.fca.org.uk/" },
   { code: "AU", name: "Australia", flag: "🇦🇺", currency: "AUD", regulator_url: "https://www.apra.gov.au/" },
+  { code: "FX", name: "Fairfax (all companies)", flag: "🏛️", currency: "USD", regulator_url: null },
+  // Fairfax markets outside the main country list: reachable through "Fairfax (all companies)".
+  { code: "UA", name: "Ukraine", flag: "🇺🇦", currency: "UAH", regulator_url: null, enabled: false },
+  { code: "ID", name: "Indonesia", flag: "🇮🇩", currency: "IDR", regulator_url: null, enabled: false },
+  { code: "BR", name: "Brazil", flag: "🇧🇷", currency: "BRL", regulator_url: null, enabled: false },
+  { code: "LK", name: "Sri Lanka", flag: "🇱🇰", currency: "LKR", regulator_url: null, enabled: false },
+  { code: "UY", name: "Uruguay", flag: "🇺🇾", currency: "UYU", regulator_url: null, enabled: false },
+  { code: "CO", name: "Colombia", flag: "🇨🇴", currency: "COP", regulator_url: null, enabled: false },
+  { code: "IN", name: "India", flag: "🇮🇳", currency: "INR", regulator_url: null, enabled: false },
+  { code: "VN", name: "Vietnam", flag: "🇻🇳", currency: "VND", regulator_url: null, enabled: false },
+  { code: "FR", name: "France", flag: "🇫🇷", currency: "EUR", regulator_url: null, enabled: false },
 ];
 
 export interface InsurerSeed {
@@ -70,8 +86,8 @@ const BY_COUNTRY: Record<string, Row[]> = {
     ["Arabia Insurance", "https://www.arabiainsurance.com", "#a6192e", "c h t b"],
   ],
   CA: [
-    ["Northbridge Insurance", "https://www.northbridgeinsurance.ca", "#00395d", "b", FFH],
-    ["Federated Insurance", "https://www.federated.ca", "#004b87", "b", FFH],
+    ["Northbridge Insurance", "https://www.northbridgeinsurance.ca", "#00395d", "c h b", FFH],
+    ["Federated Insurance", "https://www.federated.ca", "#004b87", "c h b", FFH],
     ["Intact Insurance", "https://www.intact.ca", "#e31837", "c h b"],
     ["Desjardins Insurance", "https://www.desjardins.com", "#00874e", "c h t l"],
     ["Aviva Canada", "https://www.aviva.ca", "#ffd900", "c h b"],
@@ -146,7 +162,7 @@ const BY_COUNTRY: Record<string, Row[]> = {
     ["Chubb Hong Kong", "https://www.chubb.com/hk-en/", "#01c1d6", "c h t he"],
   ],
   IE: [
-    ["Allied World (Europe)", "https://www.alliedworldinsurance.com", "#00205b", "b", FFH],
+    ["Allied World (Europe)", "https://www.alliedworldinsurance.com", "#00205b", "h b", FFH],
     ["AXA Ireland", "https://www.axa.ie", "#00008f", "c h t"],
     ["Aviva Ireland", "https://www.aviva.ie", "#ffd900", "c h t l"],
     ["FBD", "https://www.fbd.ie", "#005a9c", "c h b"],
@@ -243,9 +259,9 @@ const BY_COUNTRY: Record<string, Row[]> = {
     ["Salama Insurance", "https://www.salama.ae", "#00693e", "c h t l"],
   ],
   US: [
-    ["Crum & Forster", "https://www.cfins.com", "#003a70", "b", FFH],
+    ["Crum & Forster", "https://www.cfins.com", "#003a70", "c h b", FFH],
     ["Zenith Insurance", "https://www.thezenith.com", "#00539f", "b", FFH],
-    ["Allied World", "https://www.awac.com", "#00205b", "b", FFH],
+    ["Allied World", "https://www.awac.com", "#00205b", "h b", FFH],
     ["State Farm", "https://www.statefarm.com", "#d62311", "c h l"],
     ["Progressive", "https://www.progressive.com", "#0077c8", "c h"],
     ["GEICO", "https://www.geico.com", "#154278", "c h"],
@@ -259,6 +275,7 @@ const BY_COUNTRY: Record<string, Row[]> = {
     ["Lemonade", "https://www.lemonade.com", "#ff0083", "c h l"],
   ],
   GB: [
+    ["Brit Insurance", "https://www.britinsurance.com", "#00205b", "h b", FFH],
     ["Aviva", "https://www.aviva.co.uk", "#ffd900", "c h"],
     ["Direct Line", "https://www.directline.com", "#e30613", "c h"],
     ["Admiral", "https://www.admiral.com", "#003a70", "c h"],
@@ -273,6 +290,23 @@ const BY_COUNTRY: Record<string, Row[]> = {
     ["Youi", "https://www.youi.com.au", "#6d2077", "c h"],
   ],
 };
+
+// Fairfax companies in markets outside the main country list (associates included).
+const FAIRFAX_ELSEWHERE: Record<string, Row[]> = {
+  UA: [
+    ["ARX", "https://arx.com.ua", "#00205b", "c h t he", FFH],
+    ["Universalna", "https://universalna.com", "#0057b8", "c h t", FFH],
+  ],
+  ID: [["Asuransi MAG", "https://www.mag.co.id", "#00205b", "c h b", FFH]],
+  BR: [["Fairfax Brasil", "https://www.fairfax.com.br", "#00205b", "h b", FFH]],
+  LK: [["Fairfirst Insurance", "https://www.fairfirst.lk", "#00205b", "c h t he", FFH]],
+  UY: [["SBI Seguros", "https://www.sbi.uy", "#00205b", "c h b", FFH]],
+  CO: [["SBS Seguros", "https://www.sbseguros.co", "#00205b", "c h b", FFH]],
+  IN: [["Digit Insurance", "https://www.godigit.com", "#ffbf00", "c h t he", FFH]],
+  VN: [["BIC Insurance", "https://www.bic.vn", "#00205b", "c h t he", FFH]],
+  FR: [["Albingia", "https://www.albingia.fr", "#00205b", "h b", FFH]],
+};
+for (const [cc, rows] of Object.entries(FAIRFAX_ELSEWHERE)) BY_COUNTRY[cc] = rows;
 
 const PRODUCT_CODES: Record<string, string> = { c: "car", h: "home", t: "travel", he: "health", l: "life", b: "business" };
 
