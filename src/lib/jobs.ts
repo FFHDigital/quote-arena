@@ -1,15 +1,18 @@
 import { get, now, run } from "./db";
+import type { LlmMode } from "./llm";
 import type { JobRow } from "./types";
 
 export interface ComparePayload {
   insurerA: number;
   insurerB: number;
   product: string;
+  llm?: LlmMode;
 }
 
 export interface AuditPayload {
   insurerId: number;
   product: string;
+  llm?: LlmMode;
 }
 
 export interface ProgressEntry {

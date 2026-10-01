@@ -1,9 +1,9 @@
 import path from "node:path";
 import { chromium, type Browser } from "playwright";
 import { SCREENSHOT_DIR, get, now, run, tx } from "../db";
-import { claudeAvailable } from "../claude";
 import type { AuditMetrics, AuditRow, InsurerRow, Persona } from "../types";
-import { claudeDriver, ruleDriver } from "./drivers";
+import { claudeDriver, cliDriver, ruleDriver } from "./drivers";
+import type { LlmMode } from "../llm";
 import { AuditSession } from "./session";
 import { isQuoteForm, OBSERVE_SCRIPT, type Observation } from "./observe";
 import { scoreAudit } from "../score";
@@ -57,7 +57,7 @@ async function mobileCheck(browser: Browser, startUrl: string, navClicks: string
   }
 }
 
-export async function runAudit(auditId: number, log: (msg: string) => void = () => {}): Promise<void> {
+export async function runAudit(auditId: number, log: (msg: string) => void = () => {}, mode: LlmMode = "rules"): Promise<void> {
   const audit = get<AuditRow>(`SELECT * FROM audits WHERE id = ?`, auditId);
   if (!audit) throw new Error(`Audit ${auditId} not found`);
   const insurer = get<InsurerRow>(`SELECT * FROM insurers WHERE id = ?`, audit.insurer_id)!;
@@ -68,7 +68,7 @@ export async function runAudit(auditId: number, log: (msg: string) => void = () 
   if (!personaRow) throw new Error(`Persona ${audit.persona_id} not found.`);
   const persona = JSON.parse(personaRow.data) as Persona;
 
-  const driver = claudeAvailable() ? claudeDriver : ruleDriver;
+  const driver = mode === "api" ? claudeDriver : mode === "rules" ? ruleDriver : cliDriver(mode);
   run(`UPDATE audits SET status = 'running', started_at = ?, driver = ? WHERE id = ?`, now(), driver.name, auditId);
 
   const startUrl = resolveUrl(product.quote_start_url);
@@ -139,7 +139,7 @@ export async function runAudit(auditId: number, log: (msg: string) => void = () 
     await browser.close();
     if (get<{ status: string }>(`SELECT status FROM audits WHERE id = ?`, auditId)?.status === "captured") {
       log("Scoring the journey");
-      await scoreAudit(auditId);
+      await scoreAudit(auditId, mode);
       log("Audit scored");
     }
   }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { AuditView, VerdictView } from "@/lib/views";
+import { driverLabel, judgeLabel } from "@/lib/llmLabels";
 import EvidenceChip from "./EvidenceChip";
 import FeedbackBar from "./FeedbackBar";
 import { Card, InsurerMark, OutcomePill, ScoreBar, formatDate, formatDuration } from "./ui";
@@ -193,8 +194,8 @@ export default function VerdictResult({ v, countryName, productName }: { v: Verd
             Audited {formatDate(v.a.finishedAt)} and {formatDate(v.b.finishedAt)} with the persona &ldquo;{v.a.persona}&rdquo;.
           </li>
           <li>
-            Journeys driven by {v.a.driver === "claude" ? "the Claude browser agent" : "the rule-based driver"}; verdict by{" "}
-            {v.judge === "rules" ? "the rule-based judge (scores only)" : `${v.judge}, run in both orders${v.orderAgreement ? " with the same result" : ""}`}.
+            Journeys driven by {driverLabel(v.a.driver)}; verdict by{" "}
+            {v.judge === "rules" ? judgeLabel(v.judge) : `${judgeLabel(v.judge)}, run in both orders${v.orderAgreement ? " with the same result" : ""}`}.
           </li>
           <li>Measures how easy it is to get a quote online. Not a rating of price, cover or claims.</li>
         </ul>

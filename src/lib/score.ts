@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { all, get, now, run } from "./db";
-import { MODELS, claudeAvailable, createStructured } from "./claude";
+import { structured, usesAi, type LlmMode } from "./llm";
 import { CRITERIA, RUBRIC_VERSION, codeScores, overallScore, ruleScores, type EvidenceIndex } from "./rubric";
 import type { AuditMetrics, AuditRow, AuditScores, CriterionScore, EvidenceRow } from "./types";
 
@@ -62,7 +62,7 @@ export function evidenceDigest(rows: EvidenceRow[]): string {
     .join("\n");
 }
 
-async function llmScores(audit: AuditRow, metrics: AuditMetrics, rows: EvidenceRow[]) {
+async function llmScores(audit: AuditRow, metrics: AuditMetrics, rows: EvidenceRow[], mode: LlmMode) {
   const refs = new Set(rows.map((r) => r.ref));
   const prompt = `Product line: ${audit.product_line_id}
 Metrics (computed by code): ${JSON.stringify(metrics)}
@@ -73,8 +73,9 @@ ${evidenceDigest(rows)}`;
 
   let cost = 0;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { data, cost: c } = await createStructured(
-      { model: MODELS.scorer, max_tokens: 4000, effort: "high", system: SCORER_SYSTEM, messages: [{ role: "user", content: prompt }] },
+    const { data, cost: c } = await structured(
+      mode,
+      { role: "scorer", system: SCORER_SYSTEM, prompt, maxTokens: 4000, effort: "high" },
       ScorerOutput,
       SCORER_SCHEMA,
     );
@@ -88,7 +89,7 @@ ${evidenceDigest(rows)}`;
   return { scores: null, cost };
 }
 
-export async function scoreAudit(auditId: number): Promise<void> {
+export async function scoreAudit(auditId: number, mode: LlmMode = "rules"): Promise<void> {
   const audit = get<AuditRow>(`SELECT * FROM audits WHERE id = ?`, auditId);
   if (!audit?.metrics) throw new Error(`Audit ${auditId} has no captured journey.`);
   const metrics = JSON.parse(audit.metrics) as AuditMetrics;
@@ -98,8 +99,12 @@ export async function scoreAudit(auditId: number): Promise<void> {
   let judged: Pick<AuditScores, (typeof JUDGED)[number]> = ruleScores(metrics, idx);
   let cost = 0;
   let promptVersion = "rules";
-  if (claudeAvailable()) {
-    const res = await llmScores(audit, metrics, rows);
+  if (usesAi(mode)) {
+    const res = await llmScores(audit, metrics, rows, mode).catch((err) => {
+      // A failed AI call falls back to the rule-based scores rather than losing the audit.
+      console.error(`Scoring audit ${auditId} with ${mode} failed:`, err instanceof Error ? err.message : err);
+      return { scores: null, cost: 0 };
+    });
     cost = res.cost;
     if (res.scores) {
       judged = res.scores;

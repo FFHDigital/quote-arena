@@ -1,5 +1,6 @@
 import { all, get } from "./db";
 import { AUDIT_TTL_DAYS } from "./rubric";
+import { driverName, type LlmMode } from "./llm";
 import { ensureSeeded } from "./seed";
 import type { AuditRow, InsurerRow } from "./types";
 
@@ -50,10 +51,17 @@ export function products(countryCode: string): { id: string; name: string; avail
   ).map((p) => ({ id: p.id, name: p.name, available: p.n >= 2 }));
 }
 
-export function latestScoredAudit(insurerId: number, product: string): AuditRow | undefined {
+/** Latest scored audit, optionally only those run by a given AI mode (each AI keeps its own results). */
+export function latestScoredAudit(insurerId: number, product: string, mode?: LlmMode): AuditRow | undefined {
+  if (!mode) {
+    return get<AuditRow>(
+      `SELECT * FROM audits WHERE insurer_id = ? AND product_line_id = ? AND status = 'scored' ORDER BY finished_at DESC, id DESC LIMIT 1`,
+      insurerId, product,
+    );
+  }
   return get<AuditRow>(
-    `SELECT * FROM audits WHERE insurer_id = ? AND product_line_id = ? AND status = 'scored' ORDER BY finished_at DESC, id DESC LIMIT 1`,
-    insurerId, product,
+    `SELECT * FROM audits WHERE insurer_id = ? AND product_line_id = ? AND status = 'scored' AND driver = ? ORDER BY finished_at DESC, id DESC LIMIT 1`,
+    insurerId, product, driverName(mode),
   );
 }
 
@@ -62,7 +70,7 @@ export function isFresh(audit: AuditRow | undefined): boolean {
   return Date.now() - Date.parse(audit.finished_at) < AUDIT_TTL_DAYS * 86_400_000;
 }
 
-export function insurers(countryCode: string, product: string): InsurerOption[] {
+export function insurers(countryCode: string, product: string, mode?: LlmMode): InsurerOption[] {
   ensureSeeded();
   const rows = all<InsurerRow>(
     `SELECT i.* FROM insurers i JOIN insurer_products ip ON ip.insurer_id = i.id
@@ -70,7 +78,7 @@ export function insurers(countryCode: string, product: string): InsurerOption[] 
     countryCode, product,
   );
   return rows.map((i) => {
-    const a = latestScoredAudit(i.id, product);
+    const a = latestScoredAudit(i.id, product, mode);
     return {
       id: i.id,
       slug: i.slug,

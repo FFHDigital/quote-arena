@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { all, get, now, run, tx } from "./db";
-import { MODELS, claudeAvailable, createStructured } from "./claude";
+import { MODELS } from "./claude";
+import { structured, usesAi, type LlmMode } from "./llm";
 import { CRITERIA, CRITERION_BY_KEY, marginFor } from "./rubric";
 import { evidenceDigest } from "./score";
 import type { AuditMetrics, AuditRow, AuditScores, CriterionKey, EvidenceRow, InsurerRow, VerdictCriterion, VerdictRow } from "./types";
@@ -89,14 +90,15 @@ Evidence:
 ${digest}`;
 }
 
-async function askJudge(first: Side, second: Side): Promise<{ out: JudgeOutput; cost: number; valid: boolean }> {
+async function askJudge(first: Side, second: Side, mode: LlmMode): Promise<{ out: JudgeOutput; cost: number; valid: boolean }> {
   const refs = new Set([...first.evidence.map((e) => `1:${e.ref}`), ...second.evidence.map((e) => `2:${e.ref}`)]);
   const content = `Product line: ${first.audit.product_line_id}\n\n${sideBlock(1, first)}\n\n${sideBlock(2, second)}\n\nWhich insurer makes it easier to get a quote?`;
   let cost = 0;
   let last: JudgeOutput | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { data, cost: c } = await createStructured(
-      { model: MODELS.judge, max_tokens: 6000, effort: "high", system: JUDGE_SYSTEM, messages: [{ role: "user", content }] },
+    const { data, cost: c } = await structured(
+      mode,
+      { role: "judge", system: JUDGE_SYSTEM, prompt: content, maxTokens: 6000, effort: "high" },
       JudgeOutput,
       JUDGE_SCHEMA,
     );
@@ -136,8 +138,8 @@ function ruleVerdict(a: Side, b: Side) {
   return { winner, margin, reason, criteria, caveats: [] as string[], orderAgreement: true, needsReview: false };
 }
 
-async function llmVerdict(a: Side, b: Side) {
-  const [ab, ba] = await Promise.all([askJudge(a, b), askJudge(b, a)]);
+async function llmVerdict(a: Side, b: Side, mode: LlmMode) {
+  const [ab, ba] = await Promise.all([askJudge(a, b, mode), askJudge(b, a, mode)]);
   const map1 = { insurer_1: "a", insurer_2: "b", tie: "tie" } as const;
   const map2 = { insurer_1: "b", insurer_2: "a", tie: "tie" } as const;
   const w1 = map1[ab.out.winner];
@@ -193,7 +195,7 @@ export function findVerdict(auditA: number, auditB: number): VerdictRow | undefi
   );
 }
 
-export async function judgePair(auditA: number, auditB: number): Promise<number> {
+export async function judgePair(auditA: number, auditB: number, mode: LlmMode = "rules"): Promise<number> {
   const existing = findVerdict(auditA, auditB);
   if (existing) return existing.id;
   const a = loadSide(auditA);
@@ -201,11 +203,14 @@ export async function judgePair(auditA: number, auditB: number): Promise<number>
 
   let v: ReturnType<typeof ruleVerdict> & { cost?: number };
   let judge = "rules";
-  if (claudeAvailable()) {
-    v = await llmVerdict(a, b);
-    judge = MODELS.judge;
-  } else {
-    v = ruleVerdict(a, b);
+  v = ruleVerdict(a, b);
+  if (usesAi(mode)) {
+    try {
+      v = await llmVerdict(a, b, mode);
+      judge = mode === "api" ? MODELS.judge : mode;
+    } catch (err) {
+      console.error(`Judging audits ${auditA} and ${auditB} with ${mode} failed; using the rule-based verdict:`, err instanceof Error ? err.message : err);
+    }
   }
 
   return tx(() => {

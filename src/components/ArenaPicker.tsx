@@ -7,7 +7,7 @@ import { InsurerMark } from "./ui";
 
 type Product = { id: string; name: string; available: boolean };
 
-export default function ArenaPicker({ countries }: { countries: CountryOption[] }) {
+export default function ArenaPicker({ countries, modes }: { countries: CountryOption[]; modes: { id: string; label: string }[] }) {
   const router = useRouter();
   const [country, setCountry] = useState(countries[0]?.code ?? "");
   const [products, setProducts] = useState<Product[]>([]);
@@ -15,8 +15,9 @@ export default function ArenaPicker({ countries }: { countries: CountryOption[] 
   const [insurers, setInsurers] = useState<InsurerOption[]>([]);
   const [a, setA] = useState("");
   const [b, setB] = useState("");
+  const [ai, setAi] = useState(modes[0]?.id ?? "rules");
   const [loadedFor, setLoadedFor] = useState("");
-  const loading = loadedFor !== `${country}/${product}`;
+  const loading = loadedFor !== `${country}/${product}/${ai}`;
 
   useEffect(() => {
     if (!country) return;
@@ -36,19 +37,19 @@ export default function ArenaPicker({ countries }: { countries: CountryOption[] 
   useEffect(() => {
     if (!country || !product) return;
     let live = true;
-    fetch(`/api/countries/${country}/products/${product}/insurers`)
+    fetch(`/api/countries/${country}/products/${product}/insurers?ai=${ai}`)
       .then((r) => r.json())
       .then((list: InsurerOption[]) => {
         if (!live) return;
         setInsurers(list);
         setA((x) => (list.some((i) => i.slug === x) ? x : ""));
         setB((x) => (list.some((i) => i.slug === x) ? x : ""));
-        setLoadedFor(`${country}/${product}`);
+        setLoadedFor(`${country}/${product}/${ai}`);
       });
     return () => {
       live = false;
     };
-  }, [country, product]);
+  }, [country, product, ai]);
 
   const ready = country && product && a && b && a !== b;
   const byslug = useMemo(() => new Map(insurers.map((i) => [i.slug, i])), [insurers]);
@@ -64,7 +65,7 @@ export default function ArenaPicker({ countries }: { countries: CountryOption[] 
 
   function go(e: React.FormEvent) {
     e.preventDefault();
-    if (ready) router.push(`/c/${country.toLowerCase()}/${product}/${a}-vs-${b}`);
+    if (ready) router.push(`/c/${country.toLowerCase()}/${product}/${a}-vs-${b}?ai=${ai}`);
   }
 
   return (
@@ -136,6 +137,30 @@ export default function ArenaPicker({ countries }: { countries: CountryOption[] 
             </p>
           )}
         </li>
+        {modes.length > 1 && (
+          <li>
+            <fieldset>
+              <legend className="mb-2 text-sm font-medium">
+                <span className="mr-2 text-muted">4</span>AI that drives and judges
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {modes.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    aria-pressed={ai === m.id}
+                    onClick={() => setAi(m.id)}
+                    className={`rounded-full border px-4 py-1.5 text-sm transition ${
+                      ai === m.id ? "border-accent bg-accent-soft font-medium text-accent" : "border-line hover:bg-surface-2"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          </li>
+        )}
       </ol>
 
       <button

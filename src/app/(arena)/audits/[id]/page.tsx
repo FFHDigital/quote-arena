@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { driverLabel } from "@/lib/llmLabels";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Card, InsurerMark, OutcomePill, ScoreBar, formatDate, formatDuration } from "@/components/ui";
@@ -25,7 +26,7 @@ export default async function AuditPage({ params }: PageProps<"/audits/[id]">) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{a.insurer.name}: {a.product} quote journey</h1>
           <p className="text-sm text-muted">
-            Audited {formatDate(a.finishedAt)} · persona &ldquo;{a.persona}&rdquo; · {a.driver === "claude" ? "Claude agent" : "rule-based driver"}
+            Audited {formatDate(a.finishedAt)} · persona &ldquo;{a.persona}&rdquo; · {driverLabel(a.driver)}
           </p>
         </div>
         <div className="ml-auto text-right">

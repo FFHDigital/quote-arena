@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { MODELS, createMessage } from "../claude";
+import { structured, type LlmMode } from "../llm";
 import type { Outcome, Persona } from "../types";
 import { describe, formFields, isQuoteForm, type ObservedElement } from "./observe";
 import { LimitReached, type AuditSession } from "./session";
@@ -190,6 +191,102 @@ async function runTool(session: AuditSession, call: Anthropic.Beta.BetaToolUseBl
     default:
       return `Unknown tool ${call.name}.`;
   }
+}
+
+// ---------------------------------------------------------------- CLI agent (Claude Code or Codex)
+
+// Same rules as the API agent, but each turn returns the next actions as JSON instead of tool calls.
+const CLI_SYSTEM = AGENT_SYSTEM.replace("You operate a real browser through tools.", "You operate a real browser by returning the next actions as JSON.")
+  .replace("You may send several fill/choose/set_checked calls in one turn. Send a click last, on its own.", "Return all the fill/choose/set_checked actions a page needs in one turn, then at most one click, last.")
+  .replace(/call finish with outcome price_shown/g, "set finish to price_shown")
+  .replace(/finish with ([a-z_]+)/g, "set finish to $1");
+
+const STEP_SCHEMA = {
+  type: "object",
+  properties: {
+    actions: {
+      type: "array",
+      description: "Actions for the current page, in order. A click must be last.",
+      items: {
+        type: "object",
+        properties: {
+          kind: { type: "string", enum: ["fill", "choose", "set_checked", "click"] },
+          element_id: { type: "string", description: "Element id from the current page, without brackets." },
+          value: { type: "string", description: "Text to type, option label to choose, \"true\"/\"false\" for a checkbox, empty for a click." },
+        },
+        required: ["kind", "element_id", "value"],
+        additionalProperties: false,
+      },
+    },
+    finish: { type: "string", enum: ["continue", ...OUTCOMES], description: "\"continue\" to keep going, or the journey's outcome to end it." },
+    notes: { type: "string", description: "When finishing: two or three factual sentences about the journey and any assumptions made." },
+  },
+  required: ["actions", "finish", "notes"],
+  additionalProperties: false,
+};
+
+const Step = z.object({
+  actions: z.array(z.object({ kind: z.enum(["fill", "choose", "set_checked", "click"]), element_id: z.string(), value: z.string() })),
+  finish: z.enum(["continue", ...OUTCOMES]),
+  notes: z.string(),
+});
+
+const MAX_CLI_TURNS = 40;
+
+export function cliDriver(mode: Extract<LlmMode, "claude-cli" | "codex-cli">): Driver {
+  return {
+    name: mode,
+    async run({ session, persona, insurerName, productLine }) {
+      const header = `Insurer: ${insurerName}
+Product line: ${productLine} insurance
+Persona: ${persona.label}
+Persona details (JSON): ${JSON.stringify(persona.fields)}
+Today's date: ${new Date().toISOString().slice(0, 10)}`;
+      const history: string[] = [];
+      let idle = 0;
+
+      for (let turn = 0; turn < MAX_CLI_TURNS && !session.outcome; turn++) {
+        const prompt = `${header}
+
+What you have done so far (latest last):
+${history.slice(-15).join("\n") || "(nothing yet)"}
+
+Current page:
+${describe(session.last)}`;
+        const { data } = await structured(mode, { role: "agent", system: CLI_SYSTEM, prompt, maxTokens: 4000, effort: "medium" }, Step, STEP_SCHEMA);
+
+        for (const a of data.actions) {
+          let result: string;
+          try {
+            if (a.kind === "fill") result = await session.fill(a.element_id, a.value);
+            else if (a.kind === "choose") result = await session.choose(a.element_id, a.value);
+            else if (a.kind === "set_checked") result = await session.setChecked(a.element_id, a.value !== "false");
+            else result = await session.click(a.element_id);
+          } catch (err) {
+            if (err instanceof LimitReached) {
+              await session.finish("gave_up", err.message);
+              break;
+            }
+            result = `Action failed: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`;
+            await session.observe().catch(() => {});
+          }
+          history.push(`- ${a.kind} [${a.element_id}]${a.value ? ` "${a.value}"` : ""}: ${result.split("\n")[0].slice(0, 200)}`);
+          // Ids belong to the page they were read from; stop after a click.
+          if (a.kind === "click" || session.outcome) break;
+        }
+
+        if (session.outcome) break;
+        if (data.finish !== "continue") {
+          await session.finish(data.finish, data.notes || "No notes.");
+          break;
+        }
+        if (!data.actions.length && ++idle > 2) await session.finish("gave_up", "The agent stopped without choosing an action or an outcome.");
+        else if (data.actions.length) idle = 0;
+      }
+      if (!session.outcome) await session.finish("gave_up", `Stopped after ${MAX_CLI_TURNS} turns.`);
+      return { cost: 0 };
+    },
+  };
 }
 
 // ---------------------------------------------------------------- Rule-based fallback

@@ -2,8 +2,9 @@ import { z } from "zod";
 import { adminDenied } from "@/lib/admin";
 import { get } from "@/lib/db";
 import { enqueue } from "@/lib/jobs";
+import { pickLlm } from "@/lib/llm";
 
-const Body = z.object({ insurerId: z.number().int(), product: z.string().min(1) });
+const Body = z.object({ insurerId: z.number().int(), product: z.string().min(1), llm: z.string().optional() });
 
 export async function POST(req: Request) {
   const denied = adminDenied(req);
@@ -13,6 +14,6 @@ export async function POST(req: Request) {
   const i = get<{ audit_allowed: number }>(`SELECT audit_allowed FROM insurers WHERE id = ?`, parsed.data.insurerId);
   if (!i) return Response.json({ error: "Insurer not found." }, { status: 404 });
   if (!i.audit_allowed) return Response.json({ error: "Audits are switched off for this insurer." }, { status: 409 });
-  const jobId = enqueue("audit", parsed.data);
+  const jobId = enqueue("audit", { insurerId: parsed.data.insurerId, product: parsed.data.product, llm: pickLlm(parsed.data.llm) });
   return Response.json({ jobId }, { status: 202 });
 }

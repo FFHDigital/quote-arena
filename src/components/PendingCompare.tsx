@@ -10,7 +10,7 @@ interface JobState {
   error: string | null;
 }
 
-export default function PendingCompare(props: { country: string; product: string; a: string; b: string; names: [string, string] }) {
+export default function PendingCompare(props: { country: string; product: string; a: string; b: string; llm: string; names: [string, string] }) {
   const router = useRouter();
   const [job, setJob] = useState<JobState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export default function PendingCompare(props: { country: string; product: string
     fetch("/api/compare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ country: props.country, product: props.product, insurerA: props.a, insurerB: props.b }),
+      body: JSON.stringify({ country: props.country, product: props.product, insurerA: props.a, insurerB: props.b, llm: props.llm }),
     })
       .then(async (res) => {
         const data = await res.json();
@@ -47,7 +47,7 @@ export default function PendingCompare(props: { country: string; product: string
       live = false;
       clearTimeout(timer);
     };
-  }, [props.country, props.product, props.a, props.b, router]);
+  }, [props.country, props.product, props.a, props.b, props.llm, router]);
 
   if (error) {
     return (

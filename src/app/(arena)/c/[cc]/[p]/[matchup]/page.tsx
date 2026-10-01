@@ -7,6 +7,7 @@ import { get } from "@/lib/db";
 import { findVerdict } from "@/lib/judge";
 import Link from "next/link";
 import { Card } from "@/components/ui";
+import { LLM_LABELS, pickLlm } from "@/lib/llm";
 import { auditBlocker, insurerBySlug, isFresh, latestScoredAudit } from "@/lib/queries";
 import { verdictView } from "@/lib/views";
 
@@ -23,9 +24,10 @@ export async function generateMetadata({ params }: PageProps<"/c/[cc]/[p]/[match
   return { title: a && b ? `${a.name} vs ${b.name} | Quote Arena` : "Quote Arena" };
 }
 
-export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[matchup]">) {
+export default async function ComparePage({ params, searchParams }: PageProps<"/c/[cc]/[p]/[matchup]">) {
   await connection();
   const { cc, p, matchup } = await params;
+  const llm = pickLlm((await searchParams).ai);
   const country = cc.toUpperCase();
   const m = parse(matchup);
   if (!m || m.a === m.b) notFound();
@@ -35,8 +37,8 @@ export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[ma
   const countryRow = get<{ name: string }>(`SELECT name FROM countries WHERE code = ?`, country);
   if (!a || !b || !product || !countryRow) notFound();
 
-  const auditA = latestScoredAudit(a.id, p);
-  const auditB = latestScoredAudit(b.id, p);
+  const auditA = latestScoredAudit(a.id, p, llm);
+  const auditB = latestScoredAudit(b.id, p, llm);
   const verdict = auditA && auditB && isFresh(auditA) && isFresh(auditB) ? findVerdict(auditA.id, auditB.id) : undefined;
   const view = verdict ? verdictView(verdict.id, a.id) : null;
 
@@ -49,7 +51,7 @@ export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[ma
       <div className="grid gap-6">
         <div>
           <p className="text-sm text-muted">
-            {countryRow.name} · {product.name} insurance
+            {countryRow.name} · {product.name} insurance · judged by {LLM_LABELS[llm].short}
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
             {a.name} <span className="text-muted">vs</span> {b.name}
@@ -74,7 +76,7 @@ export default async function ComparePage({ params }: PageProps<"/c/[cc]/[p]/[ma
             </p>
           </Card>
         ) : (
-          <PendingCompare country={country} product={p} a={a.slug} b={b.slug} names={[a.name, b.name]} />
+          <PendingCompare country={country} product={p} a={a.slug} b={b.slug} llm={llm} names={[a.name, b.name]} />
         )}
       </div>
     );
