@@ -308,7 +308,7 @@ const FAIRFAX_ELSEWHERE: Record<string, Row[]> = {
 };
 for (const [cc, rows] of Object.entries(FAIRFAX_ELSEWHERE)) BY_COUNTRY[cc] = rows;
 
-// FairKarl (fairkarl/ in this repo, its own container app) sells car cover in every country, so it is listed in each market.
+// FairKarl (its own repo and container app) sells car cover in every country, so it is listed in each market.
 const FAIRKARL_URL = "https://fairkarl.calmmeadow-31431fb2.westeurope.azurecontainerapps.io";
 for (const c of REAL_COUNTRIES) {
   if (c.enabled === false || GROUP_MARKETS[c.code]) continue;

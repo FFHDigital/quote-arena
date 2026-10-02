@@ -71,7 +71,7 @@ The rule-based driver only understands English form labels, so on most real site
 
 ## Deploy (Azure Container Apps, free tier)
 
-One container runs the website, the job worker (`ARENA_EMBEDDED_WORKER=1`) and headless Chromium. Pushing to `main` builds `ghcr.io/ffhdigital/quote-arena` (public) with GitHub Actions.
+One container runs the website, the job worker (`ARENA_EMBEDDED_WORKER=1`) and headless Chromium. Pushing to `main` builds `ghcr.io/amberlightforce/quote-arena` (private) with GitHub Actions.
 
 Live: https://quote-arena.calmmeadow-31431fb2.westeurope.azurecontainerapps.io
 
@@ -91,5 +91,5 @@ Data lives on the container's own disk, so it resets when the app scales to zero
 To ship a new build after the workflow finishes:
 
 ```bash
-az containerapp update -n quote-arena -g rg-quote-arena --image ghcr.io/ffhdigital/quote-arena:<commit sha>
+az containerapp update -n quote-arena -g rg-quote-arena --image ghcr.io/amberlightforce/quote-arena:<commit sha>
 ```

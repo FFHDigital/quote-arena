@@ -12,8 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // FairKarl is a separate plain-JS app that only shares the image.
-    "fairkarl/**",
   ]),
 ]);
 
