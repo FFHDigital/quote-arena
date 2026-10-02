@@ -308,6 +308,13 @@ const FAIRFAX_ELSEWHERE: Record<string, Row[]> = {
 };
 for (const [cc, rows] of Object.entries(FAIRFAX_ELSEWHERE)) BY_COUNTRY[cc] = rows;
 
+// FairKarl (fairkarl/ in this repo, its own container app) sells car cover in every country, so it is listed in each market.
+const FAIRKARL_URL = "https://fairkarl.calmmeadow-31431fb2.westeurope.azurecontainerapps.io";
+for (const c of REAL_COUNTRIES) {
+  if (c.enabled === false || GROUP_MARKETS[c.code]) continue;
+  (BY_COUNTRY[c.code] ??= []).push(["FairKarl", `${FAIRKARL_URL}/?country=${c.code}`, "#0f766e", "c", FFH]);
+}
+
 const PRODUCT_CODES: Record<string, string> = { c: "car", h: "home", t: "travel", he: "health", l: "life", b: "business" };
 
 // Keeps slugs from the first release (e.g. GB "aviva", IE "axa") so existing audits stay attached.

@@ -6,3 +6,4 @@ data
 *.log
 *.tsbuildinfo
 Dockerfile
+fairkarl/data

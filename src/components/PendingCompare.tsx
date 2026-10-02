@@ -21,7 +21,21 @@ export default function PendingCompare(props: { country: string; product: string
     let live = true;
 
     async function poll(id: number) {
-      const res = await fetch(`/api/jobs/${id}`, { cache: "no-store" });
+      let res: Response;
+      try {
+        res = await fetch(`/api/jobs/${id}`, { cache: "no-store" });
+      } catch {
+        // The server may be restarting; try again shortly.
+        if (live) timer = setTimeout(() => poll(id), 5000);
+        return;
+      }
+      if (!live) return;
+      // The job is gone (the server restarted with a fresh database): queue the comparison again.
+      if (res.status === 404) return start();
+      if (!res.ok) {
+        timer = setTimeout(() => poll(id), 5000);
+        return;
+      }
       const data = (await res.json()) as JobState;
       if (!live) return;
       setJob(data);
@@ -30,18 +44,25 @@ export default function PendingCompare(props: { country: string; product: string
       else timer = setTimeout(() => poll(id), 2000);
     }
 
-    fetch("/api/compare", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ country: props.country, product: props.product, insurerA: props.a, insurerB: props.b, llm: props.llm }),
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Could not start the comparison.");
-        if (data.status === "ready") router.refresh();
-        else poll(data.jobId);
+    function start() {
+      fetch("/api/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ country: props.country, product: props.product, insurerA: props.a, insurerB: props.b, llm: props.llm }),
       })
-      .catch((err: Error) => setError(err.message));
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Could not start the comparison.");
+          if (!live) return;
+          if (data.status === "ready") router.refresh();
+          else poll(data.jobId);
+        })
+        .catch((err: Error) => {
+          if (live) setError(err.message);
+        });
+    }
+
+    start();
 
     return () => {
       live = false;

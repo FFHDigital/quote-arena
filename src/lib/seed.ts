@@ -176,7 +176,7 @@ export function seed() {
 }
 
 // Bump when the seed data changes so existing databases pick it up on next start.
-const SEED_VERSION = 4;
+const SEED_VERSION = 5;
 
 let seeded = false;
 export function ensureSeeded() {
